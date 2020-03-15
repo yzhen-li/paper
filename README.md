@@ -1,2 +1,2 @@
 # paper
-customized resources for writing papers
+customized resources such as latex for writing papers
