@@ -6,6 +6,10 @@ script:
 
   — chmod +x latexdockercmd.sh 
 
+  - pwd
+
+  - ls -hla
+
   — "latexdockercmd.sh latexmk -xelatex -interaction=nonstopmode -halt-on-error ./thesis_zhen/thesis_zhen.tex -outdir=./_build"
 deploy:
   provider: releases
