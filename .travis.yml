@@ -8,6 +8,10 @@ script:
 
   — pwd
 
+  — ls -hla ./thesis_zhen
+
+  — mkdir _build
+
   — ls -hla
 
   — "latexdockercmd.sh latexmk -xelatex -interaction=nonstopmode -halt-on-error ./thesis_zhen/thesis_zhen.tex -outdir=./_build"
