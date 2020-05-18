@@ -1,0 +1,1075 @@
+
+\chapter{Multimodal Hashing for Aligned Data}
+\label{chap:smh}
+
+ % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
+\section{Introduction}
+
+As of now, almost all existing \mbox{HFL} methods assume that the data are unimodal, meaning that both the queries and the candidates are of the same modality. They cannot be adapted easily for multimodal search which is often encountered in many multimedia retrieval, image analysis and data mining applications. Take crossmodal multimedia retrieval for example, using an image about a historic event as query, one may want to retrieve relevant text articles that can provide more detailed information about the event. Obviously, existing unimodal methods cannot be applied directly to multimodal similarity search because they assume that all the data are of the same modality.  Designing \mbox{HFL} methods for multimodal data is thus a very worthwhile direction to pursue.
+
+Recently, \mbox{Bronstein} \etal~\cite{bronstein2010cvpr} proposed a general framework which is referred to as \textit{multimodal hashing} (\mbox{MH}). As illustrated in Figure~\ref{smh:fig:framework} for the bimodal case, \mbox{MH} functions hash documents of different modalities into a common Hamming space so that fast similarity search can be performed. The key challenge of \mbox{MH} is to learn effective hash functions for multiple modalities efficiently from the provided information.
+
+\begin{figure}[htb]
+\centering
+\epsfig{figure=fig/mh_illustration, width=0.7\textwidth}
+\caption{Illustration of the multimodal hashing framework. Under this framework, similar documents (with bounding boxes of the same color) of different modalities are hashed to nearby points in the Hamming space whereas dissimilar documents (with bounding boxes of different colors) are hashed to points far apart.}
+\label{smh:fig:framework}
+\end{figure}
+
+In this chapter, we study a simple case of multimodal hashing, in which the data from different modalities are aligned. For example, suppose there are two modalities, i.e., image and text, if each image has been aligned with one and only one text article and vice versa, we consider the data to be aligned. The alignment can be determined by applications at hand, e.g, an image and a text can be paired if they are referring to the same object. To learn \mbox{MH} functions for these data, we first give a basic model which learns hash functions through spectral analysis of the correlation between modalities. Besides the basic method which can only handle vectorial data and is linear, we provide a kernel extension to handle nonvectorial data and incorporate nonlinearity. We further incorporate \textit{Laplacian} regularization for situations in which side information is also available in the data.
+
+%In the second method, the hash functions are learned by minimizing the multimodal reconstruction error. More specifically, given a collection of pairwise distance within each modality and pairwise relations across modalities, the model aims at minimizing the squared error between the pairwise reconstructive distance (normalized Hamming distance) computed based on the hash codes and the original distance as well as relations.
+
+%The third method is based on latent factor models.
+
+The rest of this chapter is organized as follows. In Section~\ref{smh:relatedwork}, we introduce some related work. We then present our model, \textit{spectral multimodal hashing}, in Section~\ref{smh:SMH}. Empirical studies conducted on real-world data sets are presented in Section~\ref{smh:exps}, before we conclude this chapter in Section~\ref{smh:conclusion}.
+
+ % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
+\section{Related Work}
+\label{smh:relatedwork}
+
+
+
+%\footnote{It is straightforward to extend the problem formulation to more than two modalities, but we focus on the bimodel case in this paper for notational simplicity.}
+Under the framework of multimodal hashing, we first introduce a recent work called cross modal similarity sensitive hashing (\mbox{CMSSH})~\cite{bronstein2010cvpr}, which is, to the best of our knowledge, the first work on multimodal hashing. 
+
+Suppose we have two sets of $N$ data points each from two modalities (\aka feature spaces), $\mathcal{X} = \{\x_i\in\mathbb{R}^{D_x}\}_{i=1}^{N}$ and $ \mathcal{Y} = \{\y_i\in\mathbb{R}^{D_y}\}_{i=1}^{N}$, and the corresponding points $(\x_i,\y_i)$ are paired.  For applications studied in this paper, a pair $(\x_i,\y_i)$ may represent a multimedia document where $\x_i$ is an image and $\y_i$ is the corresponding text article.  For notational convenience, we denote the data sets as matrices $\X\in\mathbb{R}^{D_x\times N}$ and $\Y\in\mathbb{R}^{D_y\times N}$ where each column corresponds to a data point. Without loss
+of generality, we assume that $\X,\Y$ have been normalized to have zero mean.
+
+CMSSH works as follows: Given a set of similar pairs $\{(\x_i,\y_i)\}$ and a set of dissimilar pairs $\{(\x_j,\y_j)\}$, where $\x\in\mathcal{X}$ and $\y\in\mathcal{Y}$ belong to two different modalities, \mbox{CMSSH} constructs two mapping functions $\xi:\mathcal{X}\rightarrow\mathbb{H}^{M}$ and $\eta:\mathcal{Y}\rightarrow\mathbb{H}^{M}$ such that, with high probability, the Hamming distance is small for similar points and large for dissimilar points. Specifically, the $m$th bit of Hamming representation $\mathbb{H}^{M}$ for $\mathcal{X}$ and $\mathcal{Y}$ can be defined by two functions, $\xi_ {m}$ and $\eta_{m}$, which are parameterized by projections $p_{m}$ and $q_{m}$, respectively. In their paper, $\xi_{m}$ and $\eta_{m}$ are assumed to have the form $\xi_{m}(\x) = \sgn(\p_{m}^{T}\x+a_{m})$ and $\eta_{m}(\y) =\sgn(\q_{m}^{T}\y+b_{m})$, where $\p_{m}$ and $\q_{m}$ are $D_{x}$- and $D_{y}$-dimensional unit vectors, $a_{m}$ and $b_{m}$ are scalars.
+
+A method based on boosting is used to learn the mapping functions.  The algorithm is briefly described here.  First, it initializes the weight of each point pair to $w_{m}(k) = 1/K$ where $K$ is the total number of point pairs. Then, for the ${m}$th bit, it selects $\xi_{m}$ and $\eta_{m}$ that maximize the following objective function:
+$$\sum\nolimits_{k=1}\nolimits^{K}\left(w_{m}(k)s_k\sgn(\p_{m}^{T}\x_k+a_{m})\sgn(\q_{m}^{T}\y_k+b_{m})\right),\nonumber$$
+where $s_k=1$ if the $k$th pair is a similar pair and $s_k = -1$ otherwise. Since maximizing the objective function above is difficult, the $\sgn(\cdot)$ operator and bias terms $a_{m},b_{m}$ are dropped to give the following approximate objective function for maximization:
+$$
+\sum\nolimits_{k=1}\nolimits^{K}w_{m}(k)s_k(\p_{m}^{T}\x_k)(\q_{m}^{T}\y_k) = \p_{m}^{T}\left(\sum\nolimits_{k=1}\nolimits^{K}w_{m}(k)s_k\x_k\y_k^{T}\right)\q_{m}.
+$$
+It is easy to see that the $\p_{m}$ and $\q_{m}$ that maximize the above objective are the largest left and right singular vectors of $\C = \sum_{k=1}^{K}w_{m}(k)s_k\x_k\y_k^{T}$. After obtaining $\p_{m}$ and $\q_{m}$, the algorithm updates the weights with the update rule $w_{m+1}(k) = w_{m}(k)\exp(-s_{k}\xi_{m}(\x)\eta_{m}(\y))$ and then proceeds to learn $\p_{m+1},\q_{m+1}$ for the $(m+1)$st bit.
+
+Roughly speaking, \mbox{CMSSH} tries to map similar points to similar codes and dissimilar points to different codes by exploiting pairwise relations across different modalities. However, it ignores relational information within the same modality which could be very useful for hash function learning~\cite{weiss2008nips,he2010kdd}. Furthermore, \mbox{CMSSH} can only handle vectorial data which might not be available in many applications.
+
+Recently, Kumar \etal extended spectral hashing~\cite{weiss2008nips} to the multi-view case, leading to a method called cross-view hashing (\mbox{CVH})~\cite{kumar2011ijcai}. The objective of \mbox{CVH} is to minimize the inter-view and intra-view Hamming distances for similar points and maximize those for dissimilar points. The optimization problem is relaxed to several generalized eigenvalue problems which can be solved by off-the-shelf methods.
+
+ % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
+\section{Spectral Multimodal Hashing}
+\label{smh:SMH}
+
+In this section, we first formulate the multimodal hashing problem as a discrete embedding problem and show that it can be approximately solved by spectral decomposition followed by thresholding, which is similar to spectral hashing~\cite{weiss2008nips} for unimodal data. But unlike spectral hashing, our focus is multimodal data, which are often encountered in a vast range of multimedia applications. Therefore, we call the proposed method \textit{spectral multimodal hashing} (\mbox{SMH}). In the following, we first give a basic \mbox{SMH} model in Section~\ref{smh:Ssmh:FORMULATION} and then present the other two models as extensions in Section~\ref{smh:Ssmh:EXT}.
+
+%present a basic multimodal hashing model in Section~\ref{sec:ssmh:smh}. In Section~\ref{sec:ssmh:ksmh}, we introduce its kernel extension (\mbox{KSMH}) which enables us to deal with nonvectorial data as well as nonlinearity.  At last, to exploit side information in the form of labels or pairwise similarity relations between points, we further extend \mbox{KSMH} by introducing two novel regularizers and propose a regularized \mbox{KSMH} (\mbox{RKSMH}) model in Section~\ref{sec:ssmh:rksmh}.
+
+
+\subsection{Formulation}
+\label{smh:Ssmh:FORMULATION}
+
+Let there be two data matrices $\X^{D_x\times N}$ and $\Y^{D_y\times N}$ from different modalities and the corresponding points $(\x_i,\y_i)$ be paired. For applications studied in this paper, a pair $(\x_i,\y_i)$ may represent a multimedia document where $\x_i$ is an image and $\y_i$ is the corresponding text article. Without loss of generality, we assume that $\X,\Y$ have been normalized to have zero mean. We want to learn two sets of hash functions $\{h_{m}\}_{m=1}^{M}$ and $\{g_{m}\}_{m=1}^{M}$ to give $M$-bit binary codes of $\X$ and $\Y$, respectively. 
+
+In this paper, we use thresholded linear projection to define the hash functions. More specifically, the $m$th hash functions for both modalities are defined as follows:
+\begin{align}
+h_{m}(\x)=\sgn(\x^T\w_{x}^{(m)}+t_x),\ \ %\mbox{or}
+g_{m}(\y)=\sgn(\y^T\w_{y}^{(m)}+t_y)\nonumber,
+\end{align}
+where $\w_{x}^{(m)}\in\mathbb{R}^{D_{x}},\w_{y}^{(m)}\in\mathbb{R}^{D_{y}}$ correspond to two projection directions. The corresponding Hamming bits can be obtained as
+\begin{align}
+\label{eqn:bit}
+b_{m}(\x) = \frac{1+h_{m}(\x)}{2}, \ \ 
+%\mbox{or}
+b_{m}(\y)= \frac{1+g_{m}(\y)}{2}.
+\end{align}
+%$(1+h_{m}(\x))/2$ and $(1+g_{m}(\y))/2$.
+
+Let the binary vectors $\h(\x) = (h_{1}(\x),\dots,h_{M}(\x))^T$ and $\g(\y) = (g_{1}(\y)\dots,g_{M}(\y))^T$ denote the projections of points $\x$ and $\y$.  
+The goal of our basic \mbox{SMH} model is to seek the projections that maximize the correlation between variables in the projected space (Hamming space). Intuitively, two hash codes are more correlated in the Hamming space if the corresponding points in the original space are similar and less correlated otherwise. Moreover, the hash codes should be balanced in the sense that each bit has equal chance of being 1 and $-1$ and the hash bits should be independent of each other~\cite{weiss2008nips}. As a result, \mbox{SMH} can be formulated as the following constrained optimization problem:
+\begin{eqnarray}
+\max_{\{\w_{x}^{(m)},\w_{y}^{(m)}\}_{m=1}^{M}}& \frac{\mathbb{E}(\h^{T}\g)}{\sqrt{\mathbb{E}(\h^{T}\h)\mathbb{E}(\g^{T}\g)}}\\
+\subto&  \sum_{i=1}^N h_{m}(\x_i) =0, \ m=1,\dots,M\nonumber\\
+&\sum_{i=1}^N g_{m}(\y_i) =0, \ m=1,\dots,M\nonumber\\
+&\sum_{i=1}^{N}h_{m}(\x_i)h_{n}(\x_i) =0, \ \forall m\neq n\nonumber\\
+&\sum_{i=1}^{N}g_{m}(\y_i)g_{n}(\y_i) =0, \ \forall m\neq n,\nonumber
+\label{eqn:cmh1}
+\end{eqnarray}
+where the expectation is taken with respect to the data distribution in the corresponding feature space. This problem is difficult to solve even without the constraints since the objective function is non-differentiable. Moreover, the balancing constraints make the problem NP-hard~\cite{weiss2008nips}.
+
+Similar to~\cite{wang2010cvpr}, we relax the problem by dropping the $\sgn(\cdot)$ operator, the thresholds $ t_x $ and $ t_y $ and the balancing constraints.  Instead, we implicitly enforce the constraints by preprocessing the data through mean-centering.  Hence we arrive at the following optimization problem for one bit:\footnote{For notational simplicity, we omit the indices of the hash functions.}
+\begin{eqnarray}
+\label{eqn:cca1}
+\max_{\w_{x},\w_{y}}& \mathbb{E}(\w_{x}^{T}\x \, \w_{y}^{T}\y)\\
+\subto&  \mathbb{E}((\w_{x}^{T}\x)^2)=1, \, \mathbb{E}((\w_{y}^{T}\y)^2)=1,\nonumber
+\end{eqnarray}
+which in fact is the standard form of \emph{canonical correlation analysis} (\mbox{CCA})~\cite{hotelling1936cca}. Approximating the expectation by empirical expectation, we rewrite Problem~(\ref{eqn:cca1}) as follows:
+\begin{eqnarray}
+\label{eqn:csmh:optprob}
+\max_{\w_{x},\w_{y}}& \w_{x}\C_{xy}\w_{y}\\
+\subto&  \w_{x}\C_{xx}\w_{x}=1, \, \w_{y}\C_{yy}\w_{y}=1, \nonumber
+\end{eqnarray}
+where $\C_{xy} = \frac{1}{N}\X\Y^{T}$, $\C_{xx} = \frac{1}{N}\X\X^{T}$, and $\C_{yy} = \frac{1}{N}\Y\Y^{T}$.
+
+This problem is equivalent to the following generalized eigenvalue problem:
+\begin{align}
+\label{eqn:csmh:wx}
+\C_{xy}\C_{yy}^{-1}\C_{xy}^{T}\w_{x} = \lambda^2\C_{xx}\w_{x}.
+\end{align}
+The solution $\w_{x}$ is the eigenvector that corresponds to the largest eigenvalue.  With the $\w_{x}$ thus computed, we can compute $\w_{y}$ as
+\begin{align}
+\label{eqn:csmh:wy}
+\w_{y} = \frac{1}{\lambda}\C_{yy}^{-1}\C_{yx}\w_{x}.
+\end{align}
+
+With projection vectors $ \w_x $ and $ \w_y $ computed, one common approach of getting the binary codes is simply using the $ \sgn(\cdot) $ operator. However, this may separate the points located near the boundary, impairing the model especially when the data distribution is dense in that area. To overcome this shortcoming, we use two thresholds, a fixed threshold of zero and a learned threshold, to get the binary codes.
+
+The learning-based threshold can be obtained as follows. For each projection, we first divide the range of projected values into $ N_b $ bins and then calculate the relative data density of each bin as $ P_{t} = N_t/N, t=1,\dots,N_b, $ with $ N_t $ stands for the number of points in the $ t $th bin. The cost of cutting the $ t $th bin is defined as follows,
+\begin{align}
+C_t = \left(\sum\nolimits_{\hat{t}=1}^{t-1}P_{\hat{t}}\right)^2 +   \left(\sum\nolimits_{\hat{t}=t+1}^{N_b}P_{\hat{t}}\right)^2 + P_t,\nonumber
+\end{align}
+which measures the relative density of the $ t $th bin and the relative density of its both sides. Intuitively, if $ C_{t} $ is small, a boundary cutting through the $ t $th bin will separate a sparse area and make the points located evenly at its both sides. Actually, $ C_t $ is an adapted surrogate of the average size of a proper hash bucket which should be as small as possible for nearest neighbor search~\cite{cayton2007nips}. We then use the center of the bin with the smallest $ C_t $ as the threshold and denote it as $ t_x $ or $ t_y $.
+
+Now we are ready to generate binary bits with 0 and $ t_x $. For example, given $ \w_x $ and $ \x^{*} $, we have
+\begin{align}
+\label{eqn:csmh:hg1}
+h_1(\x^{*}) = \sgn(\w_{x}^{T}\x^{*}), \ \ h_2(\x^{*}) = \sgn(\w_{x}^{T}\x^{*}-t_x),
+\end{align}
+and given $ \w_y $ and $ \y^{*} $, we have
+\begin{align}
+\label{eqn:csmh:hg2}
+g_1(\y^{*}) = \sgn(\w_{y}^{T}\y^{*}), \ \ g_2(\y^{*}) = \sgn(\w_{y}^{T}\y^{*}-t_y).
+\end{align}
+
+
+
+%We adopt a alternating algorithm to find the best threshold. First initialize $t_y=0$, we change the value of $t_x$ gradually from the centers.
+%
+%We first sort the values $\w_x^T\x $, then we get a vector of threshold values $[\w_x^T\x_1-0.1,(\w_x^T\x_1+\w_x^T\x_2)/2, (\w_x^T\x_2+\w_x^T\x_3)/2, \dots, (\w_x^T\x_{n-1}+\w_x^T\x_n)/2, \w_x^T\x_n+0.001]$. For the first threshold, the initial precision is evaluated. For a new threshold $t_x^{*}$, only check those affected point pairs with one end point $\x_{*}$, the precision can be changed to $\frac{total \# of point pairs * previous precision +2(\# of correct pair-\# of incorrect pair)}{total \# of point pairs}$. Given each point is involved in only a small number of points, the algorithm can be very efficient with complexity $O(Nd+P)$, where $P$ is the total number of pairs and $d$ is the average number of pairs a point is involved in.
+
+%Another extension is to generate multiple bits using one eigenvector. One bit uses threshold 0 and the other uses the threshold learned. This combination is also possible and might be useful.
+%
+%CCA may also depend on the first few eigenvectors. Let's try.
+%
+%We can compare these two approaches to see which is better.
+
+
+
+
+
+
+The basic \mbox{SMH} algorithm is summarized in Algorithm~\ref{algorithm:cmh}.
+
+\begin{algorithm}[ht]
+\caption{Algorithm of \mbox{SMH}}
+\label{algorithm:cmh}
+\begin{algorithmic}
+\STATE {\bfseries Input:} \\
+$\X$, $\Y$ -- data matrices
+\\ $M$ -- number of hash functions
+\STATE {\bfseries Procedure:}
+\STATE Compute $\C_{xx},\C_{xy},\C_{yy}$.
+\STATE Obtain $M$ eigenvectors corresponding to the $M$ largest eigenvalues of the generalized eigenvalue problem~(\ref{eqn:csmh:wx}) as $\w_{x}$'s.
+ \STATE Obtain the corresponding $\w_{y}$'s using Equation~(\ref{eqn:csmh:wy}).
+ \STATE Learn thresholds $ t_x $ and $ t_y $.
+ \STATE Obtain the hash codes of points $\x^{*}$ and $\y^{*}$ using Equations~(\ref{eqn:csmh:hg1}),~(\ref{eqn:csmh:hg2}) \& (\ref{eqn:bit}).
+
+
+\end{algorithmic}
+\end{algorithm}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Extensions}
+\label{smh:Ssmh:EXT}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsubsection{Kernel \mbox{SMH}}
+\label{smh:Ssmh:EXT:KSMH}
+
+The \mbox{SMH} model presented in the previous subsection has two limitations.  First, it can only handle vectorial data.  Second, the projection before thresholding is linear.  In this subsection, we propose a kernel extension of \mbox{SMH}, abbreviated as \mbox{KSMH} thereafter, to overcome these limitations. % by taking the kernel approach~\cite{shawe2004book}.
+
+Let $\mathcal{K}(\cdot,\cdot)$ be a valid kernel function and $\phi(\cdot)$ be the corresponding function that maps data points in the original input space to the kernel-induced feature space. In the sequel, we use $\Ph(\X) = [\phi(\x_1),\dots,\phi(\x_{N})]$ and $\Ph(\Y) = [\phi(\y_1),\dots,\phi(\y_{N})]$ to denote the data matrices in the kernel-induced feature space.
+
+%Suppose we have a set of $P$ landmark points\footnote{*** You should explain what landmark points are and why they are needed.} $\hat{\mathcal{X}} \subset\mathcal{X}$, which can also be represented by $\hat{\X}$ in the original input space and $\Ph(\hat{\X})$ in the kernel-induced feature space.  For the other modality, we define $\hat{\mathcal{Y}},\hat{\Y}$ and $\Ph(\hat{\Y})$ similarly.
+
+Taking the kernel approach~\cite{scholkopf2001colt}\cite{kulis2009nips}, we represent $\w_{x}$ and $\w_{y}$ as linear combinations of two groups of landmark points in the kernel-induced feature space, i.e.,
+\begin{align}
+\w_{x} = \Ph(\hat{\X})^{T}\alpp, \ \
+\w_{y} = \Ph(\hat{\Y})^{T}\bett,\nonumber
+\end{align}
+where $ \hat{\X}\in\mathbb{R}^{D_x\times P}$ and $\hat{\X}\in\mathbb{R}^{D_x\times P} $ are two landmark sets, in which the points are randomly chosen from $ \X $ and $ \Y  $, respectively. We note that although the landmark points should be sampled from the corresponding data distribution and be sufficiently representative, it is enough in practice to select the landmarks randomly from the training set. $\alpp\in\mathbb{R}^{P\times 1},\bett\in\mathbb{R}^{P\times 1}$ are combination coefficients. To reduce the computational cost, $P$ is usually a small number compared to $N$.
+
+The objective function of Problem~(\ref{eqn:cmh1}) can now be rewritten as
+\begin{align}
+\frac{\alpp^{T}\K_{\hat{x}x}\K_{y\hat{y}}\bett}{\sqrt{\alpp^{T}\K_{\hat{x}x}\K_{x\hat{x}}\alpp\bett^{T}\K_{\hat{y}y}\K_{y\hat{y}}\bett}},
+\label{eqn:kcsmh:obj1}
+\end{align}
+where $\K_{\hat{x}x} = \K_{x\hat{x}}^{T} = \Ph(\hat{\X})^{T}\Ph(\X)$ and $\K_{\hat{y}y} = \K_{y\hat{y}}^{T} = \Ph(\hat{\Y})^{T}\Ph(\Y)$.
+
+Since the objective function above can lead to degenerate solutions as discussed in~\cite{hardoon2004nc}, we penalize the norms of $\w_{x}$ and $\w_{y}$ in the denominator of (\ref{eqn:kcsmh:obj1}) and arrive at the following alternative form:
+\begin{align}
+\frac{\alpp^{T}\K_{\hat{x}x}\K_{y\hat{y}}\bett}{\sqrt{\alpp^{T}(\K_{\hat{x}x}\K_{x\hat{x}}+\kappa\K_{\hat{x}\hat{x}})\alpp\bett^{T}(\K_{\hat{y}y}\K_{y\hat{y}}+\kappa\K_{\hat{y}\hat{y}})\bett}},
+\label{eqn:kcsmh:obj2}
+\end{align}
+where $\K_{\hat{x}\hat{x}} = \Ph(\hat{\X})^{T}\Ph(\hat{\X}),\K_{\hat{y}y}= \Ph(\hat{\Y})^{T}\Ph(\hat{\Y})$ and $\kappa>0$ is a regularization parameter.
+%
+%We are now ready to formulate \mbox{KSMH} as the following constrained optimization problem:
+%\begin{eqnarray}
+%\max_{\alpp,\bett}& \alpp^{T}\K_{\hat{x}x}\K_{y\hat{y}}\bett\\
+%\subto&  \alpp^{T}(\K_{\hat{x}x}\K_{x\hat{x}}+\kappa\K_{\hat{x}\hat{x}})\alpp=1\nonumber\\
+%&  \bett^{T}(\K_{\hat{y}y}\K_{y\hat{y}}+\kappa\K_{\hat{y}\hat{y}})\bett=1.\nonumber
+%\end{eqnarray}
+
+After some simple relaxations and manipulations similar to \mbox{SMH}, $\alpp$ can be obtained by solving the following generalized eigenvalue problem:
+\begin{align}
+\label{eqn:kcsmh:alpha}
+\K_{\hat{x}x}\K_{y\hat{y}}(\K_{\hat{y}y}\K_{y\hat{y}} + \kappa\K_{\hat{y}\hat{y}})^{-1}\K_{\hat{y}y}\K_{x\hat{x}}\alpp =\lambda^2(\K_{\hat{x}x}\K_{x\hat{x}} + \kappa\K_{\hat{x}\hat{x}})\alpp.
+\end{align}
+After obtaining $\alpp$, we compute
+\begin{align}
+\label{eqn:kcsmh:beta}
+\bett =\frac{1}{\lambda} (\K_{\hat{y}y}\K_{y\hat{y}}+\kappa\K_{\hat{y}\hat{y}})^{-1}\K_{\hat{y}y}\K_{x\hat{x}}\alpp.
+\end{align}
+
+We can also learn the thresholds $ t_x $ and $ t_y $ using the same approach presented in the last section.  For any new point $\x^{*}$, two bits of binary code can be obtained as
+\begin{align}
+\label{eqn:kcsmh:hg1}
+h_1(\x^{*}) = \sgn(\k_{x^{*}}^{T}\alpp), \ \ h_2(\x^{*}) = \sgn(\k_{x^{*}}^{T}\alpp-t_x)
+\end{align}
+and for $ \y^{*} $, we have
+\begin{align}
+\label{eqn:kcsmh:hg2}
+g_1(\y^{*}) = \sgn(\k_{y^{*}}^{T}\bett), \ \ g_2(\y^{*}) = \sgn(\k_{y^{*}}^{T}\bett-t_y),
+\end{align}
+where $\k_{y^{*}} = \Ph(\hat{\X})^{T}\phi(\x^{*})$ and $\k_{y^{*}} = \Ph(\hat{\Y})^{T}\phi(\y^{*})$.
+
+The algorithm of \mbox{KSMH} is summarized in Algorithm~\ref{algorithm:kcmh}.
+
+\begin{algorithm}[ht]
+\caption{Algorithm of \mbox{KSMH}}
+\label{algorithm:kcmh}
+\begin{algorithmic}
+\STATE {\bfseries Input:} \\
+$\X$, $\Y$ -- data matrices
+\\$\mathcal{K}(\cdot,\cdot)$ -- kernel function
+\\ $M$ -- number of hash functions
+\\ $\kappa$ -- regularization parameter
+\STATE {\bfseries Procedure:} \\
+
+   \STATE Compute $\K_{\hat{x}x}, \K_{\hat{y}y}, \K_{\hat{x}\hat{x}}, \K_{\hat{y}\hat{y}}$.
+   \STATE Obtain $M$ eigenvectors corresponding to the $M$ largest eigenvalues of the generalized \STATE eigenvalue problem~(\ref{eqn:kcsmh:alpha}) as $\alpp$'s.
+   \STATE Obtain the corresponding $\bett$'s using Equation~(\ref{eqn:kcsmh:beta}).
+   \STATE Learn thresholds $ t_x $ and $ t_y $.
+   \STATE Obtain the hash codes of points $\x^{*}$ and $\y^{*}$ using Equations~(\ref{eqn:kcsmh:hg1}), (\ref{eqn:kcsmh:hg2}) \& (\ref{eqn:bit}).
+
+\end{algorithmic}
+
+\end{algorithm}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsubsection{Regularized kernel \mbox{SMH}}
+\label{smh:Ssmh:EXT:RKSMH}
+
+Both \mbox{SMH} and \mbox{KSMH} proposed above aim at maximizing the correlation between variables in different modalities while ignoring the relational information within each modularity.  Moreover, it is unclear how to make use of side information such as labels in the two models in case such information is available in the data.
+
+Inspired by~\cite{blaschko2008ecml}, we further extend \mbox{KSMH} by adding two \textit{Laplacian} regularization terms to the objective~(\ref{eqn:kcsmh:obj2}). We name this new model \mbox{RKSMH}, whose objective is:
+\begin{align}
+\frac{\alpp^{T}\K_{\hat{x}x}\K_{y\hat{y}}\bett}{\sqrt{\alpp^{T}(\K_{\hat{x}x}\R_{x}\K_{x\hat{x}}+\kappa\K_{\hat{x}\hat{x}})\alpp\bett^{T}(\K_{\hat{y}y}\R_{y}\K_{y\hat{y}}+\kappa\K_{\hat{y}\hat{y}})\bett}},\nonumber
+\end{align}
+where $\R_{x} = (\I+\gamma\mathcal{L}_{x}),\R_{y} = (\I+\gamma\mathcal{L}_{y})$, $\gamma>0$ is a parameter controlling the impact of regularization, and $\mathcal{L}_{x},\mathcal{L}_{y}$ are graph \textit{Laplacians}~\cite{chung1997spectral} that incorporate some information about $\X$ and $\Y$, respectively. We note that the \textit{Laplacian} matrix is defined as $\mathcal{L} = \D-\W$, where $\D$ is a diagonal matrix with $D(i,i) = \sum_{j=1}^{N}W(i,j)$.\footnote{To avoid being cluttered, we omit the subscripts here.} We note that the \textit{Laplacian} matrix can be computed efficiently by using an anchor graph~\cite{liu2010icml}.
+
+The regularizers $ \R_{x} $ and $ \R_{y} $ not only can exploit relational information of a single modality but can also incorporate into the model side information when it is available. For example, $\mathcal{L}_{x}$ can incorporate structural or geometric information in the input space $ \X $ by defining $\W_{x}$ as
+\begin{align}
+\label{eqn:wfeature}
+W_{x}(i,j) = \left\{ \begin{array}{ll}
+\exp\left(-\frac{d^2(\x_i,\x_j)}{\sigma^2}\right) & \textrm{if $\x_i,\x_j$ are neighbors}\\
+0 & \textrm{otherwise}
+\end{array} \right.
+\end{align}
+where $d(\cdot,\cdot)$ is the Euclidean distance between two points and $\sigma$ is a user-specified width parameter. In our experiments, we regard two points as neighbors if either one is among the $K$ nearest neighbors of the other one in the feature space. We call this type of \textit{Laplacian} the feature-based \textit{Laplacian}.
+
+
+$\mathcal{L}_{x}$ can also be used to incorporate side information such as labels by defining $\W_{x}$ as
+\begin{align}
+\label{eqn:wlabel}
+W_{x}(i,j) = \left\{ \begin{array}{ll}
+1 & \textrm{if $\x_i$ and $\x_j$ have the same label}\\
+0 & \textrm{otherwise}
+\end{array} \right.
+\end{align}
+We call this \textit{Laplacian} the label-based \textit{Laplacian} thereafter. Note that $\mathcal{L}_{y}$ can be defined similarly.
+
+In \mbox{RKSMH}, $\alpp$ can be obtained by solving the following generalized eigenvalue problem:
+\begin{align}
+\label{eqn:lrkcsmh:alpha}
+\K_{\hat{x}x}\K_{y\hat{y}}(\K_{\hat{y}y}\R_{y}\K_{y\hat{y}} + \kappa\K_{\hat{y}\hat{y}})^{-1}\K_{\hat{y}y}\K_{x\hat{x}}\alpp= \lambda^2(\K_{\hat{x}x}\R_{x}\K_{x\hat{x}} + \kappa\K_{\hat{x}\hat{x}})\alpp,
+\end{align}
+and $\bett$ can be computed as
+\begin{align}
+\label{eqn:lrkcsmh:beta}
+\bett =\frac{1}{\lambda} (\K_{\hat{y}y}\R_{y}\K_{y\hat{y}}+\kappa\K_{\hat{y}\hat{y}})^{-1}\K_{\hat{y}y}\K_{x\hat{x}}\alpp.
+\end{align}
+
+
+The thresholding procedure of \mbox{RKSMH} is the same as those of \mbox{KSMH} and \mbox{SMH}. The algorithm is summarized in Algorithm~\ref{algorithm:lrkcmh}.
+
+\begin{algorithm}[htb]
+\caption{Algorithm of \mbox{RKSMH}}
+\label{algorithm:lrkcmh}
+\begin{algorithmic}
+%\SetKwInOut{Input}{Input}\SetKwInOut{Output}{Output}
+\STATE {\bfseries Input:} \\
+$\X$, $\Y$ -- data matrices
+\\$\mathcal{K}(\cdot,\cdot)$ -- kernel function
+\\ $M$ -- number of hash functions
+\\ $\kappa,\gamma$ -- regularization parameters
+\STATE {\bfseries Procedure:} \\
+
+  \STATE Compute $\K_{\hat{x}x}, \K_{\hat{y}y}, \K_{\hat{x}\hat{x}}, \K_{\hat{y}\hat{y}}, \R_{x},\R_{y}$.
+   \STATE Obtain $M$ eigenvectors corresponding to the $M$ largest eigenvalues of the generalized eigenvalue problem~(\ref{eqn:lrkcsmh:alpha}) as $\alpp$'s.
+   \STATE Obtain the corresponding $\bett$'s using Equation~(\ref{eqn:lrkcsmh:beta}).
+   \STATE Learn thresholds $ t_x $ and $ t_y $.
+  \STATE  Obtain the hash codes of points $\x^{*}$ and $\y^{*}$ using Equations~(\ref{eqn:kcsmh:hg1}), (\ref{eqn:kcsmh:hg2}) \& (\ref{eqn:bit}).
+\end{algorithmic}
+\end{algorithm}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsubsection{Beyond two modalities}
+\label{smh:Ssmh:EXT:BEYOND}
+
+Our \mbox{SMH} models can easily accommodate more than two modalities, using the corresponding extensions of \mbox{CCA} and \mbox{KCCA}~\cite{hardoon2004nc}\cite{blaschko2008ecml}.
+
+Taking \mbox{SMH} for example, suppose we have $ K $ modalities and want to learn $ K $ projection vectors $ \{\w_1,\cdots,\w_K\}$, we solve the following generalized eigenvalue problem:
+\begin{align}
+\begin{pmatrix}
+\C_{11} & \cdots &\C_{1K} \\
+\vdots & \ddots &\vdots \\
+\C_{K1}&\cdots &\C_{KK} \end{pmatrix}\begin{pmatrix}\w_1\\\vdots\\\w_K\end{pmatrix} = \lambda  \begin{pmatrix}
+\C_{11} & \cdots &\0 \\
+\vdots & \ddots &\vdots \\
+\0&\cdots &\C_{KK} \end{pmatrix}\begin{pmatrix}
+\w_{1}\\
+\vdots \\
+\w_{K}\end{pmatrix},\nonumber
+\end{align} 
+where $ \C_{ij} $ is the covariance matrix between modalities $ i $ and $ j $, and $  \C_{ij} = \C_{ji}^T  $.
+
+For \mbox{KSMH}, we select landmark points from each modality and index them with $ \{\hat{1},\cdots,\hat{K}\} $. The corresponding eigenvalue problem, for projection vectors $ \{\alpha_1,\cdots,\alpha_K\} $, is:
+\begin{align}\footnotesize
+\begin{pmatrix}
+\K_{\hat{1}1}\K_{1\hat{1}} & \cdots &\K_{\hat{1}1}\K_{K\hat{K}} \\
+\vdots & \ddots &\vdots \\
+\K_{\hat{K}K}\K_{1\hat{1}}&\cdots &\K_{\hat{K}K}\K_{K\hat{K}} \end{pmatrix}\begin{pmatrix}\alpha_1\\\vdots\\\alpha_K\end{pmatrix} =
+\lambda  \begin{pmatrix}
+\K_{\hat{1}1}\K_{1\hat{1}}+\kappa\K_{\hat{1}\hat{1}} & \cdots &\0 \\
+\vdots & \ddots &\vdots \\
+\0&\cdots &\K_{\hat{K}K}\K_{K\hat{K}}+\kappa\K_{\hat{K}\hat{K}} \end{pmatrix}\begin{pmatrix}
+\alpha_{1}\\
+\vdots \\
+\alpha_{K}\end{pmatrix},\nonumber
+\end{align} 
+where $ \K_{\hat{i}i} $ is the kernel matrix between the landmark points and the training data points and $ \K_{\hat{i}\hat{i}} $ is the kernel matrix for the landmark points, for the $ i $th modality. The generalized eigenvalue problems for \mbox{RKSMH} are similar, and we omit them here due to space limitations.
+
+With the projection vectors learned, we can apply the same thresholding process to each modality and get the binary codes easily.
+
+%For multiple views, we should talk about it here. At least two ways.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%\section{Multimodal Binary Reconstructive Embedding}
+%\label{smh:MBRE}
+%The \mbox{SMH} model introduced in last subsection requires the data points in different modalities to be paired, which might not be the case in some applications. In this section, we extend a unimodal hashing method \mbox{BRE} to multimodal settings to given a novel method called \textit{multimodal binary reconstructive embedding} (\mbox{MBRE}), the inputs of which is pairwise distance or relations.
+%
+%%+++++++++++++++++++++++++++++++++++++++++++++++++++++++
+%\subsection{Model}
+%Let $M$ be the number of hash functions (\aka code length), $N$ be the number of data points, and $Q$ be the number of landmark points. Given two kinds of data points $\mathcal{X}$ and $\mathcal{Y}$,\footnote{Without loss of generality, here we assume there are two modalities and each modality has $N$ points.} similar to \mbox{BRE}, we define hash functions \wrt the $m$th bit for $\x\in\mathcal{X}$ and $\y\in\mathcal{Y}$, respectively, as follows,
+%\begin{align}
+%h_{m}(\x) = \frac{1+\sgn\left(\sum_{q=1}^{Q}W_{x}(m,q)\kappa(\x_q,\x)\right)}{2} \ \ \mbox{or} \ \ g_{m}(\x) = \frac{1+\sgn\left(\sum_{q=1}^{Q}W_{y}(m,q)\kappa(\y_q,\y)\right)}{2}\nonumber,
+%\end{align}
+%where $\W_{x}$ and $\W_{y}$ are two $M\times Q$ projection matrices, $\{\x_q\}_{q=1}^{Q}\subset\mathcal{X}$ and $\{\y_q\}_{q=1}^{Q}\subset\mathcal{Y}$ are landmark points for $\mathcal{X}$ and $\mathcal{Y}$ respectively, and $\kappa(\cdot,\cdot)$ is a kernel function. Note that defining hash functions this way is very common in kernel methods and brings us flexibility to work on a wide variety of data types. Therefore, given two points $\x\in\mathcal{X}$ and $\y\in\mathcal{Y}$, we denote their corresponding binary representations as $\tilde{\x}$ and $\tilde{\y}$ such that their $m$th bits can be evaluated by $\tilde{x}(m) = h_{m}(\x)$ and $\tilde{y}(m) = g_{m}(\y)$.
+%
+%Since in many real-world applications, it is much easier to obtain binary pairwise relationships rather than real-valued distance, here we simply define the \textit{original} distance between two points $\x_i,\x_j$ as follows,
+%\begin{align}
+%d(\x_i,\x_j) = \left\{ \begin{array}{ll}
+%0 & \textrm{if $\x_i$ and $\x_j$ belong to the same class};\\
+%1 & \textrm{otherwise},
+%\end{array} \right. \nonumber%\\
+%%d(\y_k,\y_l) = \left\{ \begin{array}{ll}
+%%0 & \textrm{if $\y_k$ and $\y_l$ are similar};\\
+%%1 & \textrm{if $\y_k$ and $\y_l$ are dissimilar},
+%%\end{array} \right. \nonumber\\
+%%%d(\x_i,\x_j) = \frac{1}{2}\|\x_i-\x_j\|^{2}_2, &\tilde{d}(\x_i,\x_j) = \frac{1}{M}\|\tilde{\x}_i-\tilde{\x}_j\|^{2}_2,\nonumber\\
+%%%d(\y_k,\y_l) = \frac{1}{2}\|\y_k-\y_l\|^{2}_2, &\tilde{d}(\y_k,\y_l) = \frac{1}{M}\|\tilde{\y}_k-\tilde{\y}_l\|^{2}_2,\nonumber
+%%d(\x_i,\y_k) = \left\{ \begin{array}{ll}
+%%0 & \textrm{if $\x_i$ and $\y_k$ are similar};\\
+%%1 & \textrm{if $\x_i$ and $\y_k$ are dissimilar},
+%%\end{array} \right. \nonumber
+%\end{align}
+%$d(\y_k,\y_l)$ and $d(\x_i,\y_k)$ are defined similarly. Note that using binary values here to define distance is just a special case, and our model can accept other definitions of distance.
+%
+%We define the \textit{reconstructive} distance between two points as follows,
+%\begin{align}
+%\tilde{d}(\x_i,\x_j) = \frac{1}{M}\|\tilde{\x}_i-\tilde{\x}_j\|^{2}_2, \ \
+%\tilde{d}(\y_k,\y_l) = \frac{1}{M}\|\tilde{\y}_k-\tilde{\y}_l\|^{2}_2, \ \
+%\tilde{d}(\x_i,\y_k) = \frac{1}{M}\|\tilde{\x}_i-\tilde{\y}_k\|^{2}_2.\nonumber
+%\end{align}
+%
+%Intuitively speaking, we try to find $\W_{x},\W_{y}$ such that the reconstructive distance are close to the original distance. More specifically, the goal of \mbox{MBRE} is to minimize the following objective,
+%\begin{align}
+%\mathcal{O}\left(\W_{x},\W_{y}\right)&=\sum_{(\x_i,\x_j)\in\mathcal{N}_{x}}\left(d(\x_i,\x_j)-\tilde{d}(\x_i,\x_j)\right)^{2}+\sum_{(\y_k,\y_l)\in\mathcal{N}_{y}}\left(d(\y_k,\y_l)-\tilde{d}(\y_k,\y_l)\right)^{2}\nonumber\\
+%&+\sum_{(\x_i,\y_k)\in\mathcal{N}_{xy}}\left(d(\x_i,\y_k)-\tilde{d}(\x_i,\y_k)\right)^{2},
+%\label{eqn:totalobj}
+%\end{align}
+%where $\mathcal{N}_{x}$ is a set of point pairs in $\mathcal{X}$, $\mathcal{N}_{y}$ is a set of point pairs in $\mathcal{Y}$ and $\mathcal{N}_{xy}$ is a set of pairs with one point in $\mathcal{X}$ and the other point in $\mathcal{Y}$. In our experiments, there are $k$ pairs for each point and so each set has size upper-bounded by $Nk$.\footnote{The total number of pairs might be smaller than $Nk$, since there might be some duplicate pairs. Besides, different sets may have different $k$ values.}  We note that the objective function of \mbox{BRE} is just the first term of that in Eqn.~(\ref{eqn:totalobj}).
+%
+%
+%%######################################
+%\subsection{Algorithm}
+%To solve the above optimization problem, we adapt the coordinate descent algorithm used in~\cite{kulis2009nips} for our model. The major difference between the adapted algorithm and the original one is threefold: 1) we update all parameters sequentially but the original algorithm randomly updates only a small subset of them;\footnote{Note that original algorithm is slow to converge because of random update.} 2) we use a warm-start approach to improve the convergence rate and obtain better performance; 3) our algorithm involves more updating terms.
+%
+%We first introduce Lemma~\ref{lemma:updatex} as follows.
+%\begin{mylem}
+%Let $\bar{D}_{x}(i,j)=d(\x_i,\x_j)-\tilde{d}(\x_i,\x_j),\bar{D}_{xy}(i,k)=d(\x_i,\y_k)-\tilde{d}(\x_i,\y_k)$. Consider updating one hash function of $\mathcal{X}$ from $h_{o}$ to $h_{n}$, and let $\h_{o}$ and $\h_{n}$ be the $N\times 1$ vectors obtained by applying the old and new hash functions to each data point in $\mathcal{X}$. Furthermore, we denote the hash function of $\mathcal{Y}$ with the same bit index as $g$ and the corresponding binary vector as $\g$. Then the objective function of using $h_{n}$ instead of $h_{o}$ can be expressed as
+%\begin{align}
+%\mathcal{O} &= \sum_{(\x_i,\x_j)\in\mathcal{N}_{x}}\left(\bar{D}_{x}(i,j)+\frac{1}{M}(h_{o}(i)-h_{o}(j))^2-\frac{1}{M}(h_{n}(i)-h_{n}(j))^2\right)^2\nonumber\\
+%&+ \sum_{(\x_i,\y_k)\in\mathcal{N}_{xy}}\left(\bar{D}_{xy}(i,k)+\frac{1-2g(k)}{M}(h_{o}(i)-h_{n}(i))\right)^2+C,
+%\end{align}
+%where $C$ is a constant independent of $h_{o}$ and $h_{n}$.
+%\label{lemma:updatex}
+%\end{mylem}
+%\begin{myproof}
+%Let $\tilde{\D}_{x}^{o}$ and $\tilde{\D}_{x}^{n}$ be the matrices of reconstructive distance using $h_{o}$ and $h_{n}$ respectively, $\H_{o}$ and $\H_{n}$ be the $N\times M$ matrices of old and new hash codes of $\mathcal{X}$ respectively, and $\G$ be the hash codes of $\mathcal{Y}$. Moreover, we use $\1_{t}$ to denote the $t$th standard basis vector and $\1$ to denote a vector of all ones, and their dimensionalities will be clear in the context.
+%
+%We can express $\tilde{\D}_{x}^{o}$ as follows,
+%\begin{align}
+%\tilde{\D}_{x}^{o} = \frac{1}{M}\left(\Ell_{xo}\1^{T}+\1\Ell^T_{o}-2\H_{o}\H_{o}^{T}\right)\nonumber,
+%\end{align}
+%where $\Ell_{xo}$ is the vector of squared norms of the rows of $\H_{o}$. Accordingly, we can express $\Ell_{xn}$ for $\H_{n}$ as $\Ell_{xn} = \Ell_{xo} - \h_{o}+\h_{n}$, since $\h_{o}$ and $\h_{n}$ are binary vectors.
+%Moreover, we can easily obtain $\H_{n} = \H_{o} +(\h_{n}-\h_{o})\1^{T}_{m}$, where $m$ is the index of the hash function being updated. Therefore,
+%\begin{align}
+%\tilde{\D}_{x}^{n}
+%&= \frac{1}{M}\left(\Ell_{xn}\1^{T}+\1\Ell_{xn}^T-2\H_{n}\H_{n}^{T}\right)\nonumber\\
+%&= \frac{1}{M}\left((\Ell_{xo} - \h_{o}+\h_{n})\1^{T}+\1(\Ell_{xo} - \h_{o}+\h_{n})^{T}-2(\H_{o} +(\h_{n}-\h_{o})\1^{T}_{m})(\H_{o} +(\h_{n}-\h_{o})\1^{T}_{m})^{T}\right)\nonumber\\
+%&= \tilde{\D}_{x}^{o}-\frac{1}{M}\left((\h_{o}\1^{T}+\1\h_{o}^{T}-2\h_{o}\h_{o}^{T})-(\h_{n}\1^{T}+\1\h_{n}^{T}-2\h_{n}\h_{n}^{T})\right).\nonumber
+%\end{align}
+%
+%Similarly, we have the following crossmodel reconstructive distance matrix,
+%\begin{align}
+%\tilde{\D}_{xy}^{o} = \frac{1}{M}\left(\Ell_{xo}\1^{T}+\1\Ell_{y}^T-2\H_{o}\G^{T}\right)\nonumber,
+%\end{align}
+%where $\Ell_{y}$ is the vector of squared norms of the rows of $\G$. Therefore,
+%\begin{align}
+%\tilde{\D}_{xy}^{n}
+%&= \frac{1}{M}\left(\Ell_{xn}\1^{T}+\1\Ell_{y}^T-2\H_{n}\G^{T}\right)\nonumber\\
+%&= \frac{1}{M}\left((\Ell_{xo} - \h_{o}+\h_{n})\1^{T}+\1\Ell_{y}^{T}-2(\H_{o} +(\h_{n}-\h_{o})\1^{T}_{m})\G^{T}\right)\nonumber\\
+%&= \tilde{\D}_{x}^{o}-\frac{1}{M}\left((\h_{o}\1^{T}-2\h_{o}\g^{T})-(\h_{n}\1^{T}-2\h_{n}\g^{T})\right).\nonumber
+%\end{align}
+%
+%Thus we can write the objective function of using $h_{n}$ instead of $h_{o}$ as
+%\begin{align}
+%\mathcal{O} &= \sum_{(\x_i,\x_j)\in\mathcal{N}_{x}}\left(\bar{D}_{x}(i,j)+\tilde{D}_{x}^{o}(i,j)-\tilde{D}_{x}^{n}(i,j)\right)^2+\sum_{(\x_i,\y_k)\in\mathcal{N}_{xy}}\left(\bar{D}_{xy}(i,k)+\tilde{D}_{xy}^{o}(i,k)-\tilde{D}_{xy}^{n}(i,k)\right)^2\nonumber\\
+%&=\sum_{(\x_i,\x_j)\in\mathcal{N}_{x}}\left(\bar{D}_{x}(i,j)+\frac{1}{M}(h_{o}(i)-h_{o}(j))^2-\frac{1}{M}(h_{n}(i)-h_{n}(j))^2\right)^2\nonumber\\
+%&+\sum_{(\x_i,\y_k)\in\mathcal{N}_{xy}}\left(\bar{D}_{xy}(i,k)+\frac{1-2g(k)}{M}(h_{o}(i)-h_{n}(i))\right)^2+C,
+%\end{align}
+%where we have made use of $h_{o}(i)^2 = h_{o}(i)$ and $h_{n}(i)^2 = h_{n}(i)$ and grouped terms irrelevant to $h_{o},h_{n}$ into $C$. This completes the proof.
+%\end{myproof}
+%
+%Now we move to the details of updating one element of $\W_{x}$, e.g., $W_{x}(m,q_0)$, with all the other elements in $\W_{x}$ fixed. Given a point $\x_i$, the $m$th hash code can be obtained by computing
+%\begin{align}
+%W_{x}(m,q_0)\kappa(\x_{q_0},\x_i)+\sum\nolimits_{q\neq q_0}W_{x}(m,q)\kappa(\x_{q},\x_i).
+%\label{eqn:threshold-1bit}
+%\end{align}
+%Equating (\ref{eqn:threshold-1bit}) to zero, we can easily obtain the incremental value for $W_{x}(m,q_0)$ that can change the current bit of $\x_i$ as
+%\begin{align}
+%    \delta_{i} = \left(\sum\nolimits_{q\neq q_0}W_{x}(m,q)\kappa(\x_{q},\x_{i})\right)/\kappa(\x_{q_0},\x_{i}) - W_{x}(m,q_0).
+%\end{align}
+%
+%If $h_m(\x_i)>0$, we should decrease $W_{x}(m,q_0)$ to flip the hash code, in another words, $\delta_i<0$. On the contrary, if $h_m(\x_i)<0$, we should increase $W_{x}(m,q_0)$ to flip the hash code, that is, $\delta_i>0$. As a result, we first find all the $\delta_{i}$'s for all $\x_{i}$'s. Then we sort $\{\delta_i\mid\delta_i>0\}$ in ascending order and $\{\delta_i\mid\delta_i<0\}$ in descending order, and thus obtain two sets of intervals. It is easy to observe that, in a fixed interval, changing $W_{x}(m,q_0)$ will not affect the hash code of any point. However, if we go across intervals, the hash code of exactly one point will be changed. As a result, starting from the current value of $W_{x}(m,q_0)$, we first increase it by adding $\delta_i+\epsilon>0$ from the smallest one to the largest one to obtain a set of possible values of objective function~(\ref{eqn:totalobj}). Note that $\epsilon$ is a very small positive number ensuring that only the $i$th bit is flipped. We then decrease $W_{x}(m,q_0)$ by adding $\delta_i-\epsilon<0$ to the starting value from the largest one to the smallest one to obtain another set of possible objective values. In total, we obtain a set of $N$ possible objective values. After getting all these values, we update $W_x(m,q_{0})$ by adding $\delta_i$ corresponding to the smallest objective $\mathcal{O}_i$ if it is smaller than original objective $\mathcal{O}$ before updating, or skip this iteration otherwise.
+%
+%The main idea of updating $W_{x}(m,q_0)$ is to find $\delta_i$ leading to the smallest objective function value.  We can compute the values sequentially in an efficient way based on Lemma~\ref{lemma:updateh}.
+%\begin{mylem}
+%Given two hash vectors $\h_{t}$ and $\h_{t-1}$ for $\mathcal{X}$ which are different in only one position, the objective w.r.t. $\h_{t}$ can be computed from that w.r.t. $\h_{t-1}$ in $O(k)$ time.
+%\label{lemma:updateh}
+%\end{mylem}
+%\begin{myproof}
+%Let the index of the point in which $\h_{t}$ and $\h_{t-1}$ are different be $a$. The only terms that change in the objective are $(\x_a,\x_j)\in\mathcal{N}_{x},(\x_i,\x_a)\in\mathcal{N}_{x}$, and $(\x_a,\y_k)\in\mathcal{N}_{xy}$. Let $f_a = 1$ if $h_{t-1}(a)=0,h_{t}(a)=1$, and $f_a=-1$ otherwise. Therefore the relevant terms in the objective function as given in Lemma~\ref{lemma:updatex} may be written as
+%\begin{align}
+%\mathcal{O}'&=\sum_{(\x_a,\x_j)\in\mathcal{N}_{x}}\left(\bar{D}_{x}(a,j)-\frac{f_a}{M}(1-2h_{t}(j))\right)^2+\sum_{(\x_i,\x_a)\in\mathcal{N}_{x}}\left(\bar{D}_{x}(i,a)-\frac{f_a}{M}(1-2h_{t}(i))\right)^2\nonumber\\
+%&+\sum_{(\x_a,\y_k)\in\mathcal{N}_{xy}}\left(\bar{D}_{xy}(a,k)-\frac{f_a}{M}(1-2g(k))\right)^2.
+%\label{eqn:updateO-1bit}\end{align}
+%
+%Since $\x_{a}$ has $k$ nearest neighbors and lives in the neighborhood of $k$ points on average, it costs $O(k)$ time to update the objective.
+%\end{myproof}
+%
+%We can update each element of $\W_{y}$ similarly with the help of the following two lemmas. %Due to lack of space, we omit the proof here.
+%
+%\begin{mylem}
+%Let $\bar{D}_{y}(k,l)=d(\y_k,\y_l)-\tilde{d}(\y_k,\y_l),\bar{D}_{xy}(i,k)=d(\x_i,\y_k)-\tilde{d}(\x_i,\y_k)$. Consider updating one hash function of $\mathcal{Y}$ from $g_{o}$ to $g_{n}$, and let $\g_{o}$ and $\g_{n}$ be the $N\times 1$ vectors obtained by applying the old and new hash functions to each data point in $\mathcal{Y}$. We further denote the hash function of $\mathcal{X}$ with the same index as $h$ and the corresponding binary vector of $\mathcal{X}$ as $\h$. Then the objective function of using $g_{n}$ instead of $g_{o}$ can be expressed as
+%\begin{align}
+%\mathcal{O} &= \sum_{(\y_k,\y_l)\in\mathcal{N}_{y}}\left(\bar{D}_{y}(k,l)+\frac{1}{M}(g_{o}(k)-g_{o}(l))^2-\frac{1}{M}(g_{n}(k)-g_{n}(l))^2\right)^2\nonumber\\
+%&+ \sum_{(\x_i,\y_k)\in\mathcal{N}_{xy}}\left(\bar{D}_{xy}(i,k)+\frac{1-2h(i)}{M}(g_{o}(k)-g_{n}(k))\right)^2+C',
+%\end{align}
+%where $C'$ is a constant independent of $g_{o}$ and $g_{n}$.
+%\label{lemma:updatey}
+%\end{mylem}
+%
+%\begin{mylem}
+%Given two hash vectors $\g_{t}$ and $\g_{t-1}$ for $\mathcal{Y}$ which are different in only one position, the objective w.r.t. $\g_{t}$ can be computed from that w.r.t. $\g_{t-1}$ in $O(k)$ time.
+%\label{lemma:updateg}
+%\end{mylem}
+%
+%As a result, the general procedure of our algorithm can be summarized as follows. We first initialize model parameters $\W_{x}, \W_{y}$. Then we update each element of $\W_{x}$ based on Lemma~\ref{lemma:updatex}\&\ref{lemma:updateh}, and each element of $\W_{y}$ based on Lemma~\ref{lemma:updatey}\&\ref{lemma:updateg}. This updating procedure iterates until $\W_{x}, \W_{y}$ converge. We then use current values of $\W_{x}, \W_{y}$ as initialization and retrain the model to get better $\W_{x}, \W_{y}$. In our experiments, this warm-start approach is very effective, $\W_{x}, \W_{y}$ will converge very fast to a better local optimum. To update one element of $\W_{x}$ or $\W_{y}$, sorting $N$ incremental values $\delta_i$'s needs $O(N\log N)$ time, obtaining all objective function values needs $O(Nk)$ time and finding the smallest $\mathcal{O}_i$'s needs $O(N)$ time. Putting everything together, the time complexity of updating one element is $O(N\log N+Nk)$. As a result, one full iteration of updating $\W_{x}$ or $\W_{y}$ requires $O(MQN(\log N+k))$ time.
+%
+%%\begin{algorithm}
+%%%\DontPrintSemicolon
+%%%\SetKwData{Left}{left}\SetKwData{This}{this}\SetKwData{Up}{up}
+%%%\SetKwFunction{Union}{Union}\SetKwFunction{FindCompress}{FindCompress}
+%%\SetKwInOut{Input}{Input}\SetKwInOut{Output}{Output}
+%%
+%%\Input{$\mathcal{N}_{x}, \mathcal{N}_{y}, \mathcal{N}_{xy}$.}
+%%\Output{$\W_{x}, \W_{y}$.}
+%%\Begin{
+%%Initialize $\W_{x}, \W_{y}$.
+%%\While{NOT Converge}{
+%%\For{$m=1$ to $M$}{    \For{$q=1$ to $Q$}{ Update $W_{x}(m,q)$.}    }
+%%\For{$m=1$ to $M$}{    \For{$q=1$ to $Q$}{ Update $W_{y}(m,q)$.}    }
+%%}}
+%%\caption{General procedure of coordinate descent}
+%%\label{algo:cmh}
+%%\end{algorithm}
+%
+%Note that local convergence in a finite number of updates is guaranteed since each update will never increase the objective function value which is lower-bounded by zero. Therefore, the algorithm is  efficient and can scale well even for large high-dimensional data sets.
+%
+% % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
+%\section{Multimodal Latent Binary Embeddings}
+%\label{smh:MLBE}
+%
+%Up to now, we have presented two models, namely, \mbox{SMH} and \mbox{MBRE}. To evaluate the data correlation, \mbox{SMH} requires paired or aligned input data which might not be easy to obtain. \mbox{MBRE} eliminates this constraint by directly finding a discrete embedding, so that the Hamming distance in the embedded space maximally approximates the original distance. In this section, we introduce an alternative multimodal hashing model to improve \mbox{SMH}, which is called \textit{multimodal latent binary embeddings} (\mbox{MLBE}), based on latent factor models. \mbox{MLBE} relates hash codes and observations of similarity, i.e., intramodel similarity and intermodel similarity, in a probabilistic model, and the hash codes can be learned easily by \mbox{MAP} estimation of the latent factors. %Among other things, \mbox{MLBE} can be easily extended to determine the proper length of hash codes.
+%
+%% the intramodel and intermodel similarities are generated based on latent binary factors and weighting matrices. 
+%
+%\subsection{Model}
+%
+%In the following, we focus on the bimodel case but it is easy to extend \mbox{MLBE} to support multiple modalities. Assume we have binary latent factors for each modality, for example, $ \U \in \{+1,-1\}^{N\times K} $ for $ \X  $ and $ \V \in \{+1,-1\}^{M\times K} $ for $ \Y  $. Correspondingly, we also have two weighting matrices, $\W^{x} \in \mathbb{R}^{K\times K}$ and $ \W^{y}  \in \mathbb{R}^{K\times K}$. The basic assumption of our model is that the observations of intramodel and intermodel similarities are determined by the latent factors and weighting matrices. The graphical representation of \mbox{MLBE} is depicted in Figure~\ref{fig:model}.
+%
+%\begin{figure}[tb]
+%\centering
+%\epsfig{figure=fig/mlbe/graphmodel, width=0.4\textwidth}
+%\caption{Graphical representation of the model of multimodal latent binary embeddings. The shaded circles are observed variables and the empty ones are latent variables.}
+%\label{fig:model}
+%\end{figure}
+%
+%
+%Given $ \U , \V , \W^{x} $ and $ \W^{y} $, the two symmetric intramodel similarity matrices $ \S^{x} \in \mathbb{R}^{N\times N}$ for  $ \X $ and $ \S^{y} \in \mathbb{R}^{M\times M}$ for $ \Y $ are generated from the following distributions, respectively:
+%$$S^{x}_{ij} \mid \U, \W^{x}  \sim \mathcal{N}(\u_i^T\W^{x}\u_j,\theta_x^2 ), \ \ \forall i \ge j, \  i,j\in\{1,\cdots,N\}, $$
+%$$S^{y}_{ij} \mid \V, \W^{y}  \sim \mathcal{N}(\v_i^T\W^{y}\v_j,\theta_y^2 ), \ \ \forall i \ge j, \  i,j\in\{1,\cdots,M\}, $$
+%where $ \u_i $ and $ \u_j $ denote the $ i $th row and $ j $th row of $ \U  $. Similarly, $ \v_i $ and $ \v_j $ denote the $ i $th row and $ j $th row of $ \V  $.
+%
+%We also observe a intermodel similarity matrix $ \S^{xy} \in \{1,0\}^{N\times M}$, where 1 and 0 stand for similar and dissimilar, respectively. For example, if an image and a text document are both for a historic event, we label them with 1. If they are irrelevant, we label them with 0. Note that it is quite common and easy to define intermodel similarity using binary values $ \{1,0\} $ in practice, but our model can also accommodate other values by simply changing the distribution. We further assume only a subset of the intermodel similarity values are observed and use an indicator matrix $ \O\in \{0,1\}^{N\times M} $ to denote this, i.e., $ O_{ij}=1 $ if $ S_{ij}^{xy} $ is observed and $ O_{ij}=0 $ otherwise. Given $ \U  $ and $ \V  $, the observed elements in $ \S^{xy} $ are generated by
+%$$S^{xy}_{ij} \mid \U, \V  \sim \mbox{Bernoulli}(\sigma(\u_i^{T}\v_j)),\ \ \forall i,j, \ O_{ij}=1,$$
+%where $ \sigma(x) = 1/(1+\exp(-x))$ is the logistic sigmoid function.
+%
+%Assume each element in $ \U\in\{+1,-1\}^{N\times K}  $ is determined identically and independently the following way,\footnote{Conventional the Bernoulli distribution is for $ \{0,1\} $ valued variables. Here, without loss of generality, we can map them to $ \{-1,+1\} $ by linear transformation.}
+%\begin{align}
+%\pi \mid \alpha_u,\beta_u &\sim \mbox{Beta}(\alpha_u,\beta_u),\nonumber\\
+%U_{ik} \mid \pi &\sim \mbox{Bernoulli}(\pi),\nonumber
+%\end{align}
+%where $ \alpha_u $ and $ \beta_u $ are hyperparameters, we can integrate out $ \pi $ to give the following prior on $ \U $:
+%\begin{align}
+%U_{ik} \mid \alpha_u,\beta_u  \sim \mbox{Bernoulli}(\frac{\alpha_u}{\alpha_u+\beta_u}), \ \ \forall i\in\{1,\cdots,N\}, \ k\in\{1,\cdots,K\}.\nonumber
+%\end{align}
+%
+%Similarly, we define the prior on $ \V \in\{+1,-1\}^{M\times K} $ as
+%\begin{align}
+%V_{ik} \mid \alpha_v,\beta_v  \sim \mbox{Bernoulli}(\frac{\alpha_v}{\alpha_v+\beta_v}), \ \ 
+%\forall i\in\{1,\cdots,M\}, \ k\in\{1,\cdots,K\}.\nonumber
+%\end{align}
+%
+%%The prior terms for $ \U  \in \{+1,-1\}^{N\times K}$ and $ \V \in \{+1,-1\}^{M\times K} $ are from ~\cite{griffiths2006nips}:
+%%$$\Pr(\U) = \prod_{k=1}^K\frac{\frac{\alpha}{K}\Gamma(N_k+\frac{\alpha}{K})\Gamma(N-N_k+1)}{\Gamma(N+1+\frac{\alpha}{K})}$$
+%%and
+%%$$\Pr(\V) = \prod_{k=1}^K\frac{\frac{\beta}{K}\Gamma(M_k+\frac{\beta}{K})\Gamma(M-M_k+1)}{\Gamma(M+1+\frac{\beta}{K})},$$
+%%where $ N_k = \sum_{i=1}^{N}\delta(U_{ik}=1) $ and $ M_k = \sum_{i=1}^{M}\delta(V_{ik}=1) $ are the number of $ 1 $'s in the $ k $th column of $ \U  $ and $ \V  $, respectively.
+%
+%For $ \X  $, the entries of the symmetric weight matrix $ \W^{x}\in\mathbb{R}^{K\times K} $ are generated identically and independently by a standard Gaussian distribution:
+%$$\W^{x}_{ij} \mid \phi_x^2  \sim \mathcal{N}(0,\phi_x^2 ), \ \  \forall i\ge j, \ i,j\in\{1,\cdots,K\}.$$
+%We put a similar prior on  $ \W^{y}\in\mathbb{R}^{K\times K} $ for $ \Y  $:
+%$$\W^{y}_{ij} \mid \phi_y^2  \sim \mathcal{N}(0,\phi_y^2 ), \ \ \forall i\ge j, \ i,j\in\{1,\cdots,K\}.$$
+%%We put simple matrix Gaussian prior on $ \W_x $ and $ \W_y $, which can be written as:
+%%$$\Pr(\w_{x}) = \mathcal{N}(\0,\phi_x\I ), \w_{x} = \W_x(:)$$
+%%$$\Pr(\w_y) = \mathcal{N}(\0,\phi_y\I ), \w_y = \W_y(:)$$
+%
+%\subsection{Algorithm}
+%
+%Based on the observations, we can learn the parameters $ \U $ and $ \V $ to give the hash codes. But finding exact posterior distributions of $ \U  $ and $ \V  $ is intractable, as a result, we adopt an alternating algorithm to find an \mbox{MAP} estimation of $ \U , \V ,\W^x $ and $ \W^y  $.
+%
+%We first update $ U_{ik} $ while fixing the others. To decide the \mbox{MAP} estimation of $ U_{ik} $, we first define a loss function with respect to $ U_{ik}$ as in Definition~\ref{def:lossu}:
+%
+%%  $ Let $ \u_i $ be the $ i $th row of $ \U  $, $\w_{x} = \W_x(:) $ and $ \s^{x}_{i} = \S_x(:,i) $, we denote $ \A_i = \mbox{kron}(\u_i, \U) $ and have $ \Pr(\s^{x}_{i}\mid \A,\w_{x}) = \mathcal{N}(\A_i\w_{x},\theta_x\I) $. The loss function of updating one element $ \U_{ik}  $:
+%
+%\begin{mydef}
+%\begin{align}
+%\mathcal{L}_{U_{ik}} &=\log\frac{\alpha_u}{\beta_u}-\frac{1}{2\theta_{x}^2}\sum_{j\neq i}^{N}\left[-2 S^{x}_{ij} \u_j^T\W^x(\u_{i}^{+} - \u_{i}^{-}) - \u_j^T\W^x(\u_{i}^{+}{\u_{i}^{+}}^{T}-\u_{i}^{-}{\u_{i}^{-}}^{T})\W^x\u_j\right]\nonumber\\
+%&+\sum_{j=1}^{M}O_{ij}\left[S_{ij}^{xy}\log \frac{\sigma_{ij}^{+}}{\sigma_{ij}^{-}} + (1-S_{ij}^{xy})\log \frac{1-\sigma_{ij}^{+}}{1-\sigma_{ij}^{-}}\right],
+%\end{align}
+%where $ U_{-ik} $ denotes all the elements in $ \U $ but $ U_{ik} $, $ \s^{x}_i $ denotes the $ i $th row of $ \S^{x} $, $ \u^{+}_i $ is the $ i $th row of $ \U  $ with $ U_{ik}=1 $ and $ \u^{-}_i $ is the $ i $th row of $ \U $ with $ U_{ik}=-1 $. We further define $ \sigma^{+}_{ij} = \sigma(\v_j^T\u_i^{+}) $ and $ \sigma^{-}_{ij} = \sigma(\v_j^T\u_i^{-}) $.
+%\label{def:lossu}\end{mydef}
+%
+%Then we have the following lemma:
+%\begin{mylem}
+%The \mbox{MAP} solution of $ U_{ik} $ is $ U_{ik}=1 $ if $ \mathcal{L}_{U_{ik}}>0 $ and $ U_{ik}=-1 $ otherwise.
+%\label{lemma:updateu}\end{mylem}
+%
+%\begin{myproof}
+%To get the \mbox{MAP} estimation of $ U_{ik} $, we only need to compare the two posterior probabilities $ \Pr(U_{ik}=1) $ and $ \Pr(U_{ik}=-1) $ conditioned on the observations and all the other model parameters. Specifically, we compute the log ratio of the two probabilities which is larger than zero if $ \Pr(U_{ik}=1) > \Pr(U_{ik}=-1)  $ and smaller than zero otherwise. The log ratio can be evaluated as follows:
+%\begin{align}
+% & \log \frac{\Pr(U_{ik} = 1\mid U_{-ik},\V , \W_x, \S^{x}, \S^{xy})}{\Pr(U_{ik} = -1\mid U_{-ik},\V , \W_x, \S^{x}, \S^{xy})}\nonumber\\
+%=& \log \frac{\Pr(U_{ik} = 1\mid \alpha,\beta)}{\Pr(U_{ik} = -1\mid \alpha,\beta)}
+%+\log \frac{\Pr(\s^{x}_i\mid U_{ik}=1, U_{-ik}, \W^{x})}{\Pr(\s^{x}_i\mid U_{ik}=-1, U_{-ik}, \W^{x})}\nonumber\\
+%+&\log \frac{\Pr(\S^{xy}\mid U_{ik}=1, U_{-ik}, \V)}{\Pr(\S^{xy}\mid U_{ik}=-1, U_{-ik}, \V)}\nonumber\\
+%=&\log\frac{\alpha_u}{\beta_u}-\frac{1}{2\theta_{x}^2}\sum_{j\neq i}^{N}\left[-2 S^{x}_{ij} \u_j^T\W^x(\u_{i}^{+} - \u_{i}^{-})\right]\nonumber\\
+%-&\frac{1}{2\theta_{x}^2}\sum_{j\neq i}^{N}\left[\u_j^T\W^x(\u_{i}^{+}{\u_{i}^{+}}^{T}-\u_{i}^{-}{\u_{i}^{-}}^{T})\W^x\u_j\right]\nonumber\\
+%+&\sum_{j=1}^{M}O_{ij}\left[S_{ij}^{xy}\log \frac{\sigma_{ij}^{+}}{\sigma_{ij}^{-}} + (1-S_{ij}^{xy})\log \frac{1-\sigma_{ij}^{+}}{1-\sigma_{ij}^{-}}\right],
+%%-\frac{1}{\theta_x}\left[{\s^{x}_i}^T (\A^{-}_{i} -  \A^{+}_{i} )\w_{x}\right]\nonumber\\
+%%&-\frac{1}{2\theta_x}\left[\w_{x}^T({\A^{+}_{i}}^{T}\A^{+}_{i} - {\A^{-}_{i}}^{T}\A^{-}_{i})\w_{x}\right]\nonumber\\
+%%&-\frac{1}{\mu}\sum_{i,j}I_{ij}\left[S^{xy}_{ij}(\sigma^{-}_{ij}-\sigma^{+}_{ij})+\frac{1}{2}({\sigma^{+}_{ij}}^2-{\sigma^{-}_{ij}}^2)\right],
+%\label{eqn:lossu}\end{align}
+%where $ U_{-ik} $ denotes all the elements in $ \U $ but $ U_{ik} $, $ \s^{x}_i $ denotes the $ i $th row of $ \S^{x} $, $ \u^{+}_i $ is the $ i $th row of $ \U  $ with $ U_{ik}=1 $ and $ \u^{-}_i $ is the $ i $th row of $ \U $ with $ U_{ik}=-1 $. We further define $ \sigma^{+}_{ij} = \sigma(\v_j^T\u_i^{+}) $ and $ \sigma^{-}_{ij} = \sigma(\v_j^T\u_i^{-}) $.
+%
+%The log ratio computed in Eqn.~(\ref{eqn:lossu}) gives exactly $ \mathcal{L}_{U_{ik}} $, hence the proof is completed.
+%\end{myproof}
+%
+%%The details can be found in Appendix.
+%
+%%We group all the terms irrelevant to $ U_{ik} $ in $ C $.
+%
+%%$ N_{-ik} = \sum_{j\neq i}\delta(U_{jk}=1)$ is the number of $ +1 $ in $ k $th column and all rows but the $ i $th row and $ I_{ij}=1 $ if $ \S^{xy}_{ij} $ is observed and  $ I_{ij}= 0 $ otherwise. We define $ \A^{+}_{i} = \mbox{kron}(\u_i,\U ) $ and $ \sigma^{+}_{ij} = \sigma(\u_i^T\v_j) $ with $ U_{ik}=1 $. We define $ \A^{-}_{i} = \mbox{kron}(\u_i,\U ) $ and $ \sigma^{-}_{ij} = \sigma(\u_i^T\v_j) $ with $ U_{ik}=-1 $.
+%
+%%
+%%$ (\hat{\u}_1-\hat{\u}_2)\w_x\S_x\nonumber\\&+(\hat{\u}_1(\W_x^T\W_x))(\hat{\u}_1-\hat{\u}_2)\nonumber\\& + (\hat{\u}_2(\W_x^T\W_x))(\hat{\u}_1-\hat{\u}_2)\nonumber\\& +\sum_{j}I_{ij}(S_{ij}-\sigma(\u_i^{T}\v_j)q)^2 $
+%%We can easily evaluate loss function~(\ref{eqn:loss_u}) and set
+%%\begin{align}
+%%U_{ik} = \left\{ \begin{array}{ll}
+%%+1 & \mathcal{L}_{U_{ik}}>0\\
+%%-1 & \mbox{otherwise}
+%%\end{array} \right.
+%%\end{align}
+%
+%Similarly, we have Definition~\ref{def:lossv} and Lemma~\ref{lemma:updatev} for \mbox{MAP} estimation of $ \V $. %Due to space limitations, we omit the proof here.
+%
+%\begin{mydef}
+%\begin{align}
+%\mathcal{L}_{V_{ik}} &=\log\frac{\alpha_v}{\beta_v}-\frac{1}{2\theta_{y}^2}\sum_{j\neq i}^{N}\left[-2 S^{y}_{ij} \v_j^T\W^y(\v_{i}^{+} - \v_{i}^{-}) - \v_j^T\W^y(\v_{i}^{+}{\v_{i}^{+}}^{T}-\v_{i}^{-}{\v_{i}^{-}}^{T})\W^y\v_j\right]\nonumber\\
+%&+\sum_{j=1}^{N}O_{ji}\left[S_{ji}^{xy}\log \frac{\sigma_{ji}^{+}}{\sigma_{ji}^{-}} + (1-S_{ji}^{xy})\log \frac{1-\sigma_{ji}^{+}}{1-\sigma_{ji}^{-}}\right],
+%\end{align}
+%where $ V_{-ik} $ denotes all the elements in $ \V $ but $ V_{ik} $, $ \s^{y}_i $ denotes the $ i $th row of $ \S^{y} $, $ \v^{+}_i $ is the $ i $th row of $ \V  $ with $ V_{ik}=1 $ and $ \v^{-}_i $ is the $ i $th row of $ \V $ with $ V_{ik}=-1 $. We further define $ \sigma^{+}_{ji} = \sigma(\u_j^T\v_i^{+}) $ and $ \sigma^{-}_{ji} = \sigma(\u_j^T\v_i^{-}) $.
+%\label{def:lossv}\end{mydef}
+%
+%
+%\begin{mylem}
+%The \mbox{MAP} solution of $ V_{ik} $ is $ V_{ik}=1 $ if $ \mathcal{L}_{V_{ik}}>0 $ and $ V_{ik}=-1 $ otherwise.
+%\label{lemma:updatev}\end{mylem}
+%
+%When fixing $ \U , \V  $ and $ \W^{y} $, we compute the \mbox{MAP} estimation of $ \W^{x} $ by maximizing the following loss function:
+%\begin{align}
+%\mathcal{L}_{\W^{x}}&= \log P(\W^{x}) + \log P(\S^{x}_{h}\mid \U ,\W^{x})\nonumber\\
+%&=\sum_{ i\ge j}^{K}\sum_{ j=1}^{K}-\frac{{W^{x}_{ij}}^2}{2\phi_x^2} + \sum_{ i > j}^{N}\sum_{ j=1}^{N}-\frac{1}{2\theta_x^2}(S^{x}_{ij}-\u_i^T\W^x\u_j)^2\nonumber\\
+%&=-\frac{1}{4\phi_x^2}\w_{x}^T(\I + \mbox{diag}(\m) )\w_{x}
+%-\frac{1}{2\theta_x^2}\left[(\s^{x}_h-\A_h\w_x)^T(\s^{x}_h-\A_h\w_x)\right]\nonumber\\
+%&= -\frac{1}{2}\w_{x}^T \left(\A_h^T\A_h +\frac{\theta^2_x}{4\phi^2_x}\left(\I + \mbox{diag}(\m) \right) \right)\w_{x}
+% + \w_{x}^T\A^T_h \s_h^x+C'
+%\label{eqn:loss_wx}\end{align}
+%where $ \w_x  $ is a $ K^2 $-dimensional column vector taken column-wise from $ \W^x $, $ \m $ is a $ K^2 $-dimensional indicator vector in which the value should be 1 if the index corresponds to $ W^{x}_{ii},i=1,\cdots,K $ and 0 otherwise.
+%Let $ \S^{x}_{h} $ denote the left-lower half of $ \S^{x} $ and its vector form be $ \s^{x}_h $. We define $ \A = \U\otimes \U $ and $ \A_h$ consists of the rows corresponding to $ S^x_{ij}, i>j $. We group all the terms irrelevant to $ \W^{x} $ in $ C' $.\footnote{Here we have used a property of Kronnecker multiplication: $ \u^T \W \v = \w^T(\u\otimes\v)  $ where $ \w $ is a column-wise vector of $ \W $ if $ \W $ is a symmetric matrix.}
+%
+%% $ \s^x = \S_x(:) $, we have $ \Pr(\s^x\mid \A,\w_{x}) = \mathcal{N}(\A\w_{x},\theta_x\I) $. The loss function of updating $ \w_{x} $ is:
+%%\begin{align}
+%%\mathcal{L}_x = -\frac{1}{2}\w_{x} (\A^T\A +\frac{\theta_x}{\phi_x}\I )\w_{x} + \s^x\A \w_{x},
+%%\end{align}
+%\begin{mylem}
+%The \mbox{MAP} estimation of $\W^{x}$ can be evaluated by:
+%\begin{align}
+%\w_{x} =\left(\A_h^T\A_h +\frac{\theta^2_x}{4\phi^2_x}\left(\I + \mbox{diag}(\m) \right)\right)^{-1}\A_h^T \s^x. \nonumber
+%\end{align}
+%\label{lemma:updatewx}
+%\end{mylem}
+%
+%Note that Lemma~\ref{lemma:updatewx} can be easily proved by setting the derivative of $ \mathcal{L}_{\W^{x}} $ with respect to $ \w_{x} $ to zero.\footnote{We can adopt gradient-based algorithms to find this global maximum, which may be much faster.} Similarly, we have Lemma~\ref{lemma:updatewy} for $ \W^{y} $.
+%
+%\begin{mylem}
+%The \mbox{MAP} estimation of $\W^{y}$ can be evaluated by:
+%\begin{align}
+%\w_{y} =\left(\B_h^T\B_h +\frac{\theta^2_y}{4\phi^2_y}\left(\I + \mbox{diag}(\m) \right)\right)^{-1}\B_h^T \s^y,\nonumber
+%\end{align}
+%where $ \w_y  $ is a $ k^2 $-dimensional column vector taken column-wise from $ \W^y $, $ \m $ is a $ k^2 $-dimensional indicator vector in which the value should be 1 if the index corresponds to $ W^{y}_{ii},i=1,\cdots,K $ and 0 otherwise.
+%Let $ \S^{y}_{h} $ denote the left-lower half of $ \S^{y} $ and its vector form be $ \s^{y}_h $. We define $ \B = \V\otimes \V $ and $ \B_h$ consists of the rows corresponding to $ S^y_{ij}, i>j $.
+%\label{lemma:updatewy}
+%\end{mylem}
+%
+%%We can update $ \W^{y} $ similarly.\footnote{Updating $ \W^{x} $ and $ \W^{y} $ needs playing with a very large matrix  $ \A_h$ which might not be handled in Matlab, so we use a small but sufficient reference set in $ \X $ and $ \Y  $ to learn $ \W^{x} $ and $ \W^{y} $ and fix them to learn $ \U  $ and $ \V $ for the whole database.}
+%
+%%Similarly, we have $ \w_y =(\B^T\B +\frac{\theta_y}{\phi_y}\I )^{-1}\B^T \s_y $, where $ \B = \mbox{kron}(\V, \V) , \w_y = \W_y(:) $ and $ \s^y = \S_y(:) $.
+%
+%
+%%The algorithm should work as follows:
+%%1 use training data to get Wx, Wy and U, V.
+%%2 fix Wx, Wy and U, V for a reference set, we then paralelly update the U and V in the test set. Each update is conducted iteratively for the elements in U or V, should be converge very fast.
+%%3 use the code to do retrieval.
+%
+%We summarize the algorithm of \mbox{MLBE} in Algorithm~\ref{algorithm:mlbe}. In our experiments, we use the log likelihood to determine the convergence.
+%
+%\begin{algorithm}[!t]
+%%\DontPrintSemicolon
+%%\SetKwData{Left}{left}\SetKwData{This}{this}\SetKwData{Up}{up}
+%%\SetKwFunction{Union}{Union}\SetKwFunction{FindCompress}{FindCompress}
+%\SetKwInOut{Input}{Input}\SetKwInOut{Output}{Output}
+%\Input{$\S_{x}$, $\S_{y}$, $\S_{xy}$ -- similarity matrices
+%\\ $\O_{xy}$ -- similarity matrices
+%\\ $M$ -- number of hash functions
+%\\ $\theta_x,\theta_y, \phi_x,\phi_y, \alpha_u,\alpha_v, \beta_u, \beta_v$ -- regularization parameters}
+%\Begin{
+%\textit{Training phase}:\\
+%   Initialize $ \U  $ and $ \V  $ with $ \{-1,+1\}$ of equal probability.
+%   \While{not converge}{
+%   Update each element of $ \W_x $ sequentially using Lemma~\ref{lemma:updatewx}.
+%   Update $ \U  $ using Lemma~\ref{lemma:updateu}.
+%   Update each element of $ \W_y $ sequentially using Lemma~\ref{lemma:updatewy}.
+%   Update $ \V $ using Lemma~\ref{lemma:updatev}.
+%   }
+%\textit{Testing phase}:\\
+%   Obtain hash codes of points $\x^{*}$ and $\y^{*}$ using Lemma~\ref{lemma:updateu} and Lemma~\ref{lemma:updatev}, respectively.
+%}
+%\caption{Algorithm of \mbox{MLBE}}
+%\label{algorithm:mlbe}
+%\end{algorithm}
+%
+%%\subsection{Complexity Analysis}
+%%-------------------------------------------------------------------------
+%
+%%\section{Max margin multimodal hashing}
+%%\label{smh:MMMH}
+%%
+%%In this section, we introduce a new model that utilize the idea of margin, which is equivalent to hinge loss. The key challenge is how to define margin in multimodal setting. And how to optimize. It will be the best if we can find some convex formulation. Nevertheless, we can use CCCP to achieve some global optimality. This should also be inspired from other embedding algorithms.
+%
+\section{Experiments}
+\label{smh:exps}
+
+We conduct several experiments to compare \mbox{SMH} and its extensions with some other related methods. Through the experiments, we want to answer the following questions for each method:
+
+\begin{enumerate}
+\item How does \mbox{SMH} perform when compared with other state-of-the-art hashing models on crossmodal retrieval task?
+\item How does \mbox{SMH} perform when compared with other state-of-the-art hashing models on unimodal retrieval task?
+\end{enumerate}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Data Sets}
+\label{smh:exps:data}
+
+In our experiments, we use two publicly available data sets that are, to the best of our knowledge, the only two up-to-date public data sets involving multiple modalities at large scale.
+
+The first data set, named \textit{Wiki}, is based on a set of Wikipedia featured articles provided by~\cite{rasiwasia2010mm}.\footnote{\url{http://www.svcl.ucsd.edu/projects/crossmodal/}} It contains a total of 2,866 documents (image-text pairs), each of which consists of an image and a text article. Each document is annotated with a label chosen from ten semantic classes. The data set has been split into a training set of 2,173 documents and a test set of 693 documents. The image representation scheme is based on the popular \textit{scale invariant feature transformation} (\mbox{SIFT})~\cite{lowe2004ijcv} with a codebook of 128 words.  Representation of a text article is based on its probability distribution over topics derived from a \textit{latent Dirichlet allocation} (\mbox{LDA}) model~\cite{blei2003jmlr} with ten topics.
+
+The second data set, named \textit{\mbox{Flickr}} thereafter, is a subset of the NUS-WIDE database\footnote{\url{http://lms.comp.nus.edu.sg/research/NUS-WIDE.htm}} which is based on images from \mbox{Flickr.com}~\cite{nus-wide-civr09}. We prune the original data set and keep only the points belonging to at least one of the ten largest classes. The data set contains a total of 186,577 image-text pairs, each of which belongs to at least one of ten possible labels (\aka concepts). The data set has been split into a training set of 185,577 pairs and a test set of 1,000 pairs. The images are represented by a $500$-dimensional \mbox{SIFT} representation. The text is simply represented by the number of occurrences of the 1,000 most frequently used tags according to the image.
+
+Some characteristics of the two data sets are summarized in Table~\ref{table:data}.
+
+\begin{table}[!t]
+% increase table row spacing, adjust to taste
+% \renewcommand{\arraystretch}{1.3}
+% if using array.sty, it might be a good idea to tweak the value of \extrarowheight as needed to properly center the text within the cells
+\caption{Characteristics of Data Sets}\vspace{0.5cm}
+\label{table:data}
+\centering
+\begin{tabular}{|c|c|c|c|c|}
+\hline
+Data set & $D_{x}$ &  $D_{y}$ &  \# of points &\# of classes\\
+\hline
+Wiki& 128& 10& 2,866 & 10\\
+\hline
+\mbox{Flickr}& 500& 1000& 186,577 &10\\
+\hline
+\end{tabular}
+\end{table}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Experimental Settings}
+\label{smh:exps:settings}
+
+To mimic real multimedia retrieval systems, we consider two tasks in our experiments: crossmodel and uni-modal retrieval. In cross-modal retrieval, the query and the database belong to different modalities, for example, an image is used as a query and a set of text is used as a database. In uni-modal retrieval, the query and the database belong to the same modality. For each task, we first train the models on the training set, and then use documents in the test set as queries and the training set as database.
+
+We use two evaluation measures in both cases, namely, \textit{mean average precision} (\mbox{MAP}) and precision at a fixed Hamming radius. \mbox{MAP} is a measure widely used by the information retrieval community~\cite{baeza1999book,rasiwasia2010mm}. Specifically, the \mbox{MAP} for a set of queries is the mean of the \textit{average precision} (\mbox{AP}) scores for each query, with
+$$\textrm{AP} = \frac{1}{L}\sum\nolimits_{r=1}\nolimits^{N}P(r)\times\delta(r),$$
+where $r$ is the rank position, $N$ is the number of retrieved documents, $\delta(r)$ is a binary function that returns 1 if the document at rank position $r$ is relevant\footnote{In the experiments, an image is relevant to a text if they share the same class label and vice versa.} to the query and 0 otherwise, $P(r)$ is the precision of relevance at position $r$, and $L$ is the total number of relevant documents in the retrieved set. \mbox{MAP} is sometimes referred to geometrically as the area under the precision-recall curve for a set of queries~\cite{turpin2006sigir}. Thus a larger value of \mbox{MAP} indicates a better performance. To get the precision at Hamming radius $d$, we first retrieve all the documents which have Hamming distance at most $d$ to the query and then compute the precision of the retrieved documents. Similar to \mbox{MAP}, larger values of precision indicate better performance. In all experiments, we set the rank position $r=100$ and the Hamming radius $d=2$.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Results} % of \mbox{SMH}
+\label{smh:exps:results_smh}
+
+In the following experiments, we randomly select $P=500$  data points from the training set as landmarks for \mbox{KSMH} and \mbox{RKSMH} and repeat the process ten times. Hence for these two methods, we report the average results with the corresponding standard deviations. Moreover, linear kernel is used, Laplacians are defined based on labels and the parameters are set to $\kappa = 10^{-4}$, $\gamma = 0.1$ for the \mbox{Wiki} data set and $\gamma=100$ for the \mbox{Flickr} data set.  Besides, to reduce computational cost on the \mbox{Flickr} data set, we use a subset of 5,000 instances from the training set to train the models but the retrieval tasks are still conducted on the whole training set.
+
+%%%%%%%%%%%%%%%%%%%
+\subsubsection{Comparison for crossmodel retrieval}
+\label{smh:exps:results:cross}
+
+We first compare the four multimodal hashing methods, i.e., \mbox{CMSSH}, \mbox{SMH}, \mbox{KSMH} and \mbox{RKSMH}, for crossmodel retrieval. The results for different code lengths $M$ on the \mbox{Wiki} data set are reported in Table~\ref{table:comp-wiki-cross-it}~\&~\ref{table:comp-wiki-cross-ti}, and those on the \mbox{Flickr} data set are reported in Table~\ref{table:comp-flickr-cross-it}~\&~\ref{table:comp-flickr-cross-ti}.
+
+\begin{table}[htb]\small
+\caption{Performance comparison for Image-Text retrieval on \mbox{Wiki}}\label{table:comp-wiki-cross-it}\vspace{-0.5cm}
+\begin{center}
+\begin{tabular}{|c|c|c|c|c|}
+\toprule[1pt]\addlinespace[0pt]
+    \multirow{2}{*}{Method}&  \multirow{2}{*}{Measure}  &  \multicolumn{3}{|c|}{Image query -- Text database}  \\
+\cline{3-5}%\addlinespace[0pt]\midrule[1pt]\addlinespace[0pt]
+&&$M=4$&$M=8$&$M=16$\\
+\hline
+\multirow{2}{*}{CMSSH}&{MAP}    &    $0.1660     $        &  $    0.1640    $ &$ 0.1751$  \\
+\cline{2-5}%\addlinespace[0pt]\cmidrule[0.5pt]{2-5}\addlinespace[0pt]
+&{Precision}    &     	$0.1150   $         &     $   0.1501  $         &        $  {\bf0.3487} $       \\
+\hline%\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+\multirow{2}{*}{SMH}&MAP        &     $0.1937 $         &     $  0.2290    $      &  $ 0.2140$ \\
+\cline{2-5}%\addlinespace[0pt]\cmidrule[0.5pt]{2-5}\addlinespace[0pt]
+&{Precision}    &     	$0.1252   $         &   $ {\bf 0.1640}   $            &    $ 0.2200$         \\
+\hline%\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+\multirow{2}{*}{KSMH}&MAP        &   $0.1909\pm 0.0032$       &  ${\bf0.2194\pm0.0052}$         & $0.2177\pm 0.0058$  \\
+\cline{2-5}%\addlinespace[0pt]\cmidrule[0.5pt]{2-5}\addlinespace[0pt]
+&{Precision}    &  ${\bf0.1253\pm0.0008}$         & $0.1635\pm 0.0045$              &  $0.2186\pm0.0130$\\
+\hline%\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+\multirow{2}{*}{RKSMH}&MAP        &     ${\bf 0.1918\pm0.0021}$         & $0.2189\pm0.0036$          & ${\bf0.2200\pm0.0046}$  \\
+\cline{2-5}%\addlinespace[0pt]\cmidrule[0.5pt]{2-5}\addlinespace[0pt]
+&{Precision}    &    	$0.1219\pm 0.0008        $          &    $0.1633\pm0.0032$           &    $0.2172\pm0.0084$         \\
+\addlinespace[0pt]\bottomrule[1pt]
+\end{tabular}
+\end{center}
+\end{table}
+
+\begin{table}[htb]\small
+\caption{Performance comparison for Text-Image retrieval on \mbox{Wiki}}\label{table:comp-wiki-cross-ti}\vspace{-0.5cm}
+\begin{center}
+\begin{tabular}{|c|c|c|c|c|}
+\toprule[1pt]\addlinespace[0pt]
+    \multirow{2}{*}{Method}&  \multirow{2}{*}{Measure}  &  \multicolumn{3}{|c|}{Text query -- Image database}\\
+\cline{3-5}%\addlinespace[0pt]\midrule[1pt]\addlinespace[0pt]
+&&$M=4$&$M=8$&$M=16$\\
+\hline
+\multirow{2}{*}{CMSSH}&{MAP}     &$  0.1928  $&$   0.1746 $& $     0.1950   $\\
+\cline{2-5}%\addlinespace[0pt]\cmidrule[0.5pt]{2-5}\addlinespace[0pt]
+&{Precision}    & $0.1142$&$   0.1389    $&$    0.1320    $\\
+\hline%\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+\multirow{2}{*}{SMH}&MAP        &${\bf 0.2208}       $&$ {\bf0.2784}  $&$ {\bf0.3494} $\\
+\cline{2-5}%\addlinespace[0pt]\cmidrule[0.5pt]{2-5}\addlinespace[0pt]
+&{Precision}    &$0.1258      $&$ {\bf0.1800}   $&$ {\bf0.3047} $\\
+\hline%\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+\multirow{2}{*}{KSMH}&MAP        & $0.2207\pm0.0039$& $ 0.2765\pm 0.0052 $&$ 0.3108\pm 0.0059 $\\
+\cline{2-5}%\addlinespace[0pt]\cmidrule[0.5pt]{2-5}\addlinespace[0pt]
+&{Precision}    & ${\bf 0.1264\pm0.0013}$&$ 0.1782\pm 0.0071 $&$ 0.2780\pm 0.0118 $\\
+\hline%\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+\multirow{2}{*}{RKSMH}&MAP & $0.2088\pm0.0038$&$ 0.2559\pm 0.0065 $&$ 0.3171\pm 0.0075 $\\
+\cline{2-5}%\addlinespace[0pt]\cmidrule[0.5pt]{2-5}\addlinespace[0pt]
+&{Precision}   &$0.1228        \pm0.0008       $&$ 0.1740\pm  0.0045 $&$ 0.2774\pm 0.0106  $\\
+\addlinespace[0pt]\bottomrule[1pt]
+\end{tabular}
+\end{center}
+\end{table}
+
+\begin{table}[htb]\small
+\caption{Performance comparison for Image-Text retrieval on \mbox{Flickr}}\label{table:comp-flickr-cross-it}\vspace{-0.5cm}
+\begin{center}
+\begin{tabular}{|c|c|c|c|c|}
+\toprule[1pt]\addlinespace[0pt]
+    \multirow{2}{*}{Method}&  \multirow{2}{*}{Measure}  &  \multicolumn{3}{|c|}{Image query -- Text database}  \\
+\cline{3-5}%\addlinespace[0pt]\midrule[1pt]\addlinespace[0pt]
+&&$M=4$&$M=8$&$M=16$\\
+\hline
+\multirow{2}{*}{CMSSH}&{MAP}    &    $0.3723  $           &  $  0.3822  $ &$  0.4100$  \\
+\cline{2-5}%\addlinespace[0pt]\cmidrule[0.5pt]{2-5}\addlinespace[0pt]
+&{Precision}    &     	$0.3458 $         &     $   0.3503 $         &        $   0.4104$       \\
+\hline%\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+\multirow{2}{*}{SMH}&MAP        &     $0.3463  $         &     $  0.3872  $      &  $  0.4159$ \\
+\cline{2-5}%\addlinespace[0pt]\cmidrule[0.5pt]{2-5}\addlinespace[0pt]
+&{Precision}    &     	$0.3451  $         &   $   0.4130 $            &    $  0.4100$         \\
+\hline%\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+\multirow{2}{*}{KSMH}&MAP        &   ${\bf0.4604 \pm 0.0116}$       &  $   0.4747 \pm  0.0136  $         & $   0.4718\pm    0.0066$\\
+\cline{2-5}%\addlinespace[0pt]\cmidrule[0.5pt]{2-5}\addlinespace[0pt]
+&{Precision}    &     	${\bf 0.3778  \pm0.0052}  $         & $   0.4148  \pm   0.0066  $              &  $ 0.4390\pm  0.0111$ \\
+\hline%\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+\multirow{2}{*}{RKSMH}&MAP        &     $0.4482 \pm 0.0125  $         & $ {\bf  0.4782   \pm  0.0052}  $          & $ {\bf 0.4865\pm   0.0037}  $ \\
+\cline{2-5}%\addlinespace[0pt]\cmidrule[0.5pt]{2-5}\addlinespace[0pt]
+&{Precision}    &    	$0.3709  \pm0.0038 $          &    $ {\bf 0.4185   \pm   0.0065}$           &    $ {\bf 0.4690\pm  0.0094} $\\
+\addlinespace[0pt]\bottomrule[1pt]
+\end{tabular}
+\end{center}
+\end{table}
+
+\begin{table}[htb]\small
+\caption{Performance comparison for Text-Image retrieval on \mbox{Flickr}}\label{table:comp-flickr-cross-ti}\vspace{-0.5cm}
+\begin{center}
+\begin{tabular}{|c|c|c|c|c|}
+\toprule[1pt]\addlinespace[0pt]
+    \multirow{2}{*}{Method}&  \multirow{2}{*}{Measure}  &  \multicolumn{3}{|c|}{Text query -- Image database}\\
+\cline{3-5}%\addlinespace[0pt]\midrule[1pt]\addlinespace[0pt]
+&&$M=4$&$M=8$&$M=16$\\
+\hline
+\multirow{2}{*}{CMSSH}&{MAP}      &${\bf 0.4824}  $&$   {0.4829}  $& $    0.4712 $\\
+\cline{2-5}%\addlinespace[0pt]\cmidrule[0.5pt]{2-5}\addlinespace[0pt]
+&{Precision}    & $0.3467 $&$   0.3616   $&$  {\bf 0.5286 } $\\
+\hline%\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+\multirow{2}{*}{SMH}&MAP &$0.3590  $&$   0.4056  $&$    0.4520 $\\
+\cline{2-5}%\addlinespace[0pt]\cmidrule[0.5pt]{2-5}\addlinespace[0pt]
+&{Precision}     &$0.3447   $&$ {\bf  0.4346 }  $&$   0.4460 $\\
+\hline%\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+\multirow{2}{*}{KSMH}&MAP      & $0.4683   \pm0.0146$&$    0.4849  \pm     0.0119   $&$ 0.4860\pm   0.0102 $\\
+\cline{2-5}%\addlinespace[0pt]\cmidrule[0.5pt]{2-5}\addlinespace[0pt]
+&{Precision}   & $  {\bf 0.3839   \pm0.0054}  $&$   0.4260\pm    0.0073     $&$   0.4537\pm  0.0114 $\\
+\hline%\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+\multirow{2}{*}{RKSMH}&MAP & $0.4610 \pm0.0066 $&$   {\bf 0.5013  \pm   0.0081}    $&$   {\bf 0.5098 \pm   0.0050}$\\
+\cline{2-5}%\addlinespace[0pt]\cmidrule[0.5pt]{2-5}\addlinespace[0pt]
+&{Precision}    &$0.3750   \pm0.0057   $&$  0.4241   \pm  0.0082    $&$  0.4751\pm  0.0141  $\\
+\addlinespace[0pt]\bottomrule[1pt]
+\end{tabular}
+\end{center}
+\end{table}
+
+From the tables, we can see that all three \mbox{SMH} models outperform \mbox{CMSSH} by a large margin on both data sets. Among our three models, \mbox{RKSMH} performs the best on both data sets, indicating the effectiveness of \textit{Laplacian} regularization. We also note that  \mbox{KSMH} achieves performance similar to that of \mbox{SMH} on the \mbox{Wiki} data set and better performance than \mbox{SMH} on the \mbox{Flickr} data set, showing that the kernel extension is quite useful.
+
+%%%%%%%%%%%%%%%%%%%
+\subsubsection{Comparison for unimodel retrieval}
+\label{smh:exps:results:uni}
+
+In this section, we compare the four multimodal and two well-known unimodel hashing-based methods for unimodel retrieval.  It should be noted that multimodel hashing algorithms learn hash functions from both modalities whereas the unimodel hashing algorithms learn hash functions from only one modality. The results are summarized in Table~\ref{table:comp-wiki-uni-ii}~\&~\ref{table:comp-wiki-uni-tt} for the \mbox{Wiki} data set, and Table~\ref{table:comp-flickr-uni-ii}~\&~\ref{table:comp-flickr-uni-tt} for the \mbox{Flickr} data set.
+
+\begin{table}[htb]\small
+\caption{Performance comparison for image retrieval on \mbox{Wiki}}\label{table:comp-wiki-uni-ii}\vspace{-0.5cm}
+\begin{center}
+\begin{tabular}{|c|c|c|c|c|}
+\toprule[1pt]\addlinespace[0pt]
+    \multirow{2}{*}{Method}&  \multirow{2}{*}{Measure}  &  \multicolumn{3}{|c|}{Image query -- Image database}  \\
+\cline{3-5}%\addlinespace[0pt]\midrule[1pt]\addlinespace[0pt]
+&&$M=4$&$M=8$&$M=16$\\
+\hline
+\multirow{2}{*}{SH}&{MAP}    & $0.1559$   &  $0.1545$&$ 0.1552 $ \\
+\cline{2-5}%
+&{Precision}    &      $0.1084$         &        $0.1084$      &  $ 0.1083 $\\
+\hline %\addlinespace[0pt]\midrule[0.8pt]\addlinespace[0pt]
+\multirow{2}{*}{CMSSH}&{MAP}    &    $0.1640  $           &  $    0.1683   $ &$ 0.1743$  \\
+\cline{2-5}%\addlinespace[0pt]\cmidrule[0.5pt]{2-5}\addlinespace[0pt]
+&{Precision}    &     	$0.1139  $         &     $    0.1171   $         &        $  0.1294 $       \\
+\hline%\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+\multirow{2}{*}{SMH}&MAP        &     ${\bf 0.1773}  $         &     $  {\bf 0.1930} $      &  $  {\bf 0.1903}$ \\
+\cline{2-5}%\addlinespace[0pt]\cmidrule[0.5pt]{2-5}\addlinespace[0pt]
+&{Precision}    &     	$ {\bf 0.1178}  $         &   $ {\bf 0.1352}  $            &    $  {\bf 0.1536}$         \\
+\hline%\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+\multirow{2}{*}{KSMH}&MAP        &   $0.1759        \pm 0.0014    $       &  $0.1912\pm 0.0031 $         & $0.1892\pm   0.0019$ \\
+\cline{2-5}%\addlinespace[0pt]\cmidrule[0.5pt]{2-5}\addlinespace[0pt]
+&{Precision}    &     	$0.1173  \pm0.0004  $         & $  0.1343 \pm  0.0011  $              &  $   0.1533\pm   0.0029$       \\
+\hline%\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+\multirow{2}{*}{RKSMH}&MAP        &     $0.1747        \pm0.0014       $         & $0.1848\pm 0.0020$          & $0.1884\pm0.0019$  \\
+\cline{2-5}%\addlinespace[0pt]\cmidrule[0.5pt]{2-5}\addlinespace[0pt]
+&{Precision}    &    	$0.1155        \pm0.0006       $          &    $0.1324\pm 0.0007$           &    $0.1512\pm0.0022$         \\
+\addlinespace[0pt]\bottomrule[1pt]
+\end{tabular}
+\end{center}
+\end{table}
+
+\begin{table}[htb]\small
+\caption{Performance comparison for text retrieval on \mbox{Wiki}}\label{table:comp-wiki-uni-tt}\vspace{-0.5cm}
+\begin{center}
+\begin{tabular}{|c|c|c|c|c|}
+\toprule[1pt]\addlinespace[0pt]
+    \multirow{2}{*}{Method}&  \multirow{2}{*}{Measure}  &  \multicolumn{3}{|c|}{Text query -- Text database}\\
+\cline{3-5}%\addlinespace[0pt]\midrule[1pt]\addlinespace[0pt]
+&&$M=4$&$M=8$&$M=16$\\
+\hline
+\multirow{2}{*}{SH}&{MAP}  & ${\bf 0.3068}$ & $0.3986$&$ 0.5590 $\\
+\cline{2-5}%
+&{Precision}    &  $0.1084$           &$0.1086$&$ 0.1721 $\\
+\hline %\addlinespace[0pt]\midrule[0.8pt]\addlinespace[0pt]
+\multirow{2}{*}{CMSSH}&{MAP}   &$0.3024   $&$    0.4737     $& $  0.5364 $\\
+\cline{2-5}%\addlinespace[0pt]\cmidrule[0.5pt]{2-5}\addlinespace[0pt]
+&{Precision}    & $0.1739   $&$   0.2752      $&$   0.4179  $\\
+\hline%\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+\multirow{2}{*}{SMH}&MAP      &$0.2850      $&$ 0.4461   $&$ 0.5563  $\\
+\cline{2-5}%\addlinespace[0pt]\cmidrule[0.5pt]{2-5}\addlinespace[0pt]
+&{Precision}     &$0.1358      $&$ 0.2648   $&$ 0.5704 $\\
+\hline%\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+\multirow{2}{*}{KSMH}&MAP        & $0.3066        \pm0.0220    $&$ 0.4627\pm  0.0173 $&$ 0.5590\pm    0.0068 $\\
+\cline{2-5}%\addlinespace[0pt]\cmidrule[0.5pt]{2-5}\addlinespace[0pt]
+&{Precision}   & $ {\bf 0.1397   \pm0.0041 } $&$  0.2742 \pm    0.0226    $&$    0.5741\pm 0.0217 $\\
+\hline%\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+\multirow{2}{*}{RKSMH}&MAP       & $0.2891        \pm0.0046       $&$ {\bf 0.5078\pm  0.0046} $&$ {\bf 0.5697\pm0.0041 } $\\
+\cline{2-5}%\addlinespace[0pt]\cmidrule[0.5pt]{2-5}\addlinespace[0pt]
+&{Precision}    &$0.1328       \pm0.0013      $&$ {\bf 0.2786 \pm  0.0144 } $&$ {\bf 0.5927 \pm 0.0143} $\\
+\addlinespace[0pt]\bottomrule[1pt]
+\end{tabular}
+\end{center}
+\end{table}
+
+
+\begin{table}[htb]\small
+\caption{Performance comparison for image retrieval on \mbox{Flickr}}\label{table:comp-flickr-uni-ii}\vspace{-0.5cm}
+\begin{center}
+\begin{tabular}{|c|c|c|c|c|}
+\toprule[1pt]\addlinespace[0pt]
+    \multirow{2}{*}{Method}&  \multirow{2}{*}{Measure}  &  \multicolumn{3}{|c|}{Image query -- Image database}  \\
+\cline{3-5}%\addlinespace[0pt]\midrule[1pt]\addlinespace[0pt]
+&&$M=4$&$M=8$&$M=16$\\
+\hline
+\multirow{2}{*}{SH}&{MAP}    &     $0.3743$          &  $0.3780$ &$0.3793  $\\
+\cline{2-5}%\addlinespace[0pt]\cmidrule[0.5pt]{2-5}\addlinespace[0pt]
+&{Precision}    &       $0.3449$        &      $0.3449$       &$0.3449$ \\
+\hline %\addlinespace[0pt]\midrule[0.8pt]\addlinespace[0pt]
+\multirow{2}{*}{CMSSH}&{MAP}    &    $0.4064  $           &  $   0.4262  $ &$ 0.4304$  \\
+\cline{2-5}%\addlinespace[0pt]\cmidrule[0.5pt]{2-5}\addlinespace[0pt]
+&{Precision}    &     	$0.3396   $         &     $ 0.3376  $         &        $  0.3424$       \\
+\hline%\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+\multirow{2}{*}{SMH}&MAP        &     $0.3753 $         &     $   0.4326  $      &  $  0.4388$ \\
+\cline{2-5}%\addlinespace[0pt]\cmidrule[0.5pt]{2-5}\addlinespace[0pt]
+&{Precision}    &     	$0.3450 $         &   $   0.3786  $            &    $  0.4075$         \\
+\hline%\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+\multirow{2}{*}{KSMH}&MAP        &   ${\bf 0.4498   \pm 0.0061 } $       &  $   0.4642 \pm   0.0051  $         & $ 0.4606\pm  0.0034$  \\
+\cline{2-5}%\addlinespace[0pt]\cmidrule[0.5pt]{2-5}\addlinespace[0pt]
+&{Precision}    &     	${\bf 0.3746 \pm0.0059 } $         & $ {\bf 0.4095  \pm   0.0103}   $              &  $  0.4342\pm  0.0126$       \\
+\hline%\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+\multirow{2}{*}{RKSMH}&MAP        &     $0.4390 \pm0.0062 $         & $ {\bf  0.4726  \pm 0.0055}   $          & $ {\bf  0.4783\pm    0.0029}$  \\
+\cline{2-5}%\addlinespace[0pt]\cmidrule[0.5pt]{2-5}\addlinespace[0pt]
+&{Precision}    &    	$0.3668 \pm0.0050 $          &    $  0.4020   \pm   0.0070 $           &    $ {\bf  0.4403\pm   0.0082}$         \\
+\addlinespace[0pt]\bottomrule[1pt]
+\end{tabular}
+\end{center}
+\end{table}
+
+\begin{table}[htb]\small
+\caption{Performance comparison for text retrieval on \mbox{Flickr}}\label{table:comp-flickr-uni-tt}\vspace{-0.5cm}
+\begin{center}
+\begin{tabular}{|c|c|c|c|c|}
+\toprule[1pt]\addlinespace[0pt]
+    \multirow{2}{*}{Method}&  \multirow{2}{*}{Measure} &  \multicolumn{3}{|c|}{Text query -- Text database}\\
+\cline{3-5}%\addlinespace[0pt]\midrule[1pt]\addlinespace[0pt]
+&&$M=4$&$M=8$&$M=16$\\
+\hline
+\multirow{2}{*}{SH}&{MAP}    & $0.3753$ & $0.3756$&$ 0.3752 $\\
+\cline{2-5}%\addlinespace[0pt]\cmidrule[0.5pt]{2-5}\addlinespace[0pt]
+&{Precision}    &      $0.3449$         &$0.3449$&$0.3449$\\
+\hline %\addlinespace[0pt]\midrule[0.8pt]\addlinespace[0pt]
+\multirow{2}{*}{CMSSH}&{MAP}  &$0.4762 $&$   0.5197   $&$  {\bf 0.5832 } $ \\
+\cline{2-5}%\addlinespace[0pt]\cmidrule[0.5pt]{2-5}\addlinespace[0pt]
+&{Precision}  & $0.3824  $&$   0.3962   $&$   0.4112 $\\
+\hline%\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+\multirow{2}{*}{SMH}&MAP &$0.3769 $&$    0.4650   $&$   0.5031 $\\
+\cline{2-5}%\addlinespace[0pt]\cmidrule[0.5pt]{2-5}\addlinespace[0pt]
+&{Precision}    &$ 0.3449 $&$    0.3838   $&$   0.4356  $\\
+\hline%\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+\multirow{2}{*}{KSMH}&MAP       & $ {\bf 0.4866      \pm0.0135}$&$ 0.5132  \pm    0.0098    $&$ 0.5177\pm   0.0095  $\\
+\cline{2-5}%\addlinespace[0pt]\cmidrule[0.5pt]{2-5}\addlinespace[0pt]
+&{Precision}     & ${\bf 0.3839   \pm0.0062 } $&$    0.4342  \pm   0.0121   $& $ 0.4760\pm  0.0112  $\\
+\hline%\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+\multirow{2}{*}{RKSMH}&MAP      & $0.4723  \pm0.0153  $&$ {\bf 0.5245  \pm  0.0103 }     $&$   0.5441\pm  0.0068  $\\
+\cline{2-5}%\addlinespace[0pt]\cmidrule[0.5pt]{2-5}\addlinespace[0pt]
+&{Precision}       &$0.3777  \pm 0.0036 $&$  {\bf 0.4394 \pm   0.0073 }    $&$ {\bf  0.5117\pm  0.0127 }  $\\
+\addlinespace[0pt]\bottomrule[1pt]
+\end{tabular}
+\end{center}
+\end{table}
+
+Similar to the results of crossmodal retrieval, our models outperform \mbox{CMSSH} on both data sets and the performance gap is larger on the \mbox{Flickr} data set. As expected, \mbox{RKSMH} achieves the best performance among our methods and \mbox{KSMH} is better than \mbox{SMH}. Note that our methods perform better than one state-of-the-art unimodal hashing methods, namely, \textit{spectral hashing}, indicating that information from other modalities can help to learn good hash codes for unimodal retrieval. As a result, \mbox{SMH}, especially \mbox{RKSMH}, is also very useful for unimodal retrieval systems.
+
+% % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
+\section{Conclusion}
+\label{smh:conclusion}
+
+In this chapter, we have proposed spectral multimodal hashing (\mbox{SMH}) under the framework of multimodal hashing, the goal of which is to perform similarity search on data of multiple modalities. \mbox{SMH} learns the hash codes through spectral analysis of the modality correlation. Experimental results show that our \mbox{SMH} model outperforms the state-of-the-art methods. %However, \mbox{SMH} has an apparent limitation, that is, it is only for the aligned data which may not be available in some applications. 
+
+In the future, we wish to relax the data alignment assumption of SMH and develop more general multimodal hashing methods. In addition, we would like to apply SMH to other applications such as multimodal medical image registration.%In the next chapter, we propose a new multimodal hashing model for graph data which is more general than aligned data.
+

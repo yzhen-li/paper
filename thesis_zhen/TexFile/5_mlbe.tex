@@ -1,0 +1,1114 @@
+
+\chapter{Multimodal Hashing for Graph Data}
+\label{chap:mlbe}
+
+ % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
+\section{Introduction}
+
+So far as we know, existing multimodal hashing methods including CMSSH and CVH have achieved successes in several applications but they also have some apparent limitations.  First, both models can only deal with vectorial data which may not be available in some applications.  Besides, they both involve eigendecomposition operations which may be very costly especially when the data dimensionality is high.  Furthermore, \mbox{CMSSH} has been developed for shape retrieval and medical image alignment applications and \mbox{CVH} for people search applications in the natural language processing area. These applications are very different from those studied in this thesis.
+
+Although spectral multimodal hashing has solved some of the issues mentioned above, it is also based on eigendecomposition and requires the data to be aligned. In this chapter, we study hashing-based similarity search in the context of multimodal graph data, in which pairwise similarity of data points is provided and different modalities are no longer aligned.
+
+We propose a probabilistic latent factor model, called \textit{multimodal latent binary embedding}~(\mbox{MLBE}),
+to learn hash functions for multiple modalities.  As a generative model, the hash codes are binary latent factors in a common Hamming space which determine the generation of both intra-modality and inter-modality similarities as observed either directly or indirectly.  Although getting a full Bayesian solution is intractable, we devise an efficient algorithm for learning the binary latent factors based on \textit{maximum a posteriori} (\mbox{MAP}) estimation. Compared to its counterparts~\cite{bronstein2010cvpr,kumar2011ijcai}, MLBE can:
+\begin{itemize}
+\item[(a)] be interpreted easily in a principled manner;
+\item[(b)] be extended easily;
+\item[(c)] avoid overfitting via parameter learning;
+%\item accommodate both vectorial and non-vectorial data;
+\item[(d)] support efficient learning algorithms.
+\end{itemize}
+
+The remainder of this chapter is organized as follows. Section~\ref{mlbe:model} presents the model formulation, the learning algorithm, some model extensions as well as discussion. Experimental validation of \mbox{MLBE} conducted using both synthetic data and two realistic data sets is presented in Section~\ref{mlbe:exps}. Finally, Section~\ref{mlbe:conclusion} concludes the chapter.
+
+%Section~\ref{mlbe:relatedwork} briefly introduces some recent related work. 
+%\section{Related Work}
+%\label{mlbe:relatedwork}
+
+%Our work bears some resemblance to metric learning which aims at learning similarity or distance measures from data~\cite{xing2002nips}.  Such data-dependent similarity measures are generally more effective than their data-independent counterparts.  Although a lot of research has been conducted on metric learning, multimodal metric learning is still largely unexplored even though multimodal data are commonly found in many applications.  Some recent efforts have been made on non-hashing-based methods~\cite{lee2009cvpr,quadrianto2011icml}.  Compared with hashing-based methods, these methods do not have the merits of low storage requirement and high search speed.
+
+%To the best of our knowledge, Bronstein \etal proposed the first hashing-based model, called cross-modal similarity sensitive hashing (\mbox{CMSSH}) thereafter, for multimodal similarity search~\cite{bronstein2010cvpr}. Specifically, given a set of similar and dissimilar point pairs, \mbox{CMSSH} constructs two groups of linear hash functions (for the bimodal case) such that, with high probability, the Hamming distance after mapping is small for similar points and large for dissimilar points. In their formulation, each hash function (for one bit) can be obtained by solving a singular value decomposition (\mbox{SVD}) problem and the hash functions are learned sequentially in a standard boosting manner. However, \mbox{CMSSH} ignores the intra-modality relational information which could be very useful~\cite{weiss2008nips}.
+
+
+
+
+
+
+
+%For multiple views, we should talk about it here. At least two ways.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%\section{Multimodal Binary Reconstructive Embedding}
+%\label{MH:MBRE}
+%The \mbox{SMH} model introduced in last subsection requires the data points in different modalities to be paired, which might not be the case in some applications. In this section, we extend a uni-modal hashing method \mbox{BRE} to multimodal settings to given a novel method called \textit{multimodal binary reconstructive embedding} (\mbox{MBRE}), the inputs of which is pairwise distance or relations.
+%
+%%+++++++++++++++++++++++++++++++++++++++++++++++++++++++
+%\subsection{Model}
+%Let $M$ be the number of hash functions (\aka code length), $N$ be the number of data points, and $Q$ be the number of landmark points. Given two kinds of data points $\mathcal{X}$ and $\mathcal{Y}$,\footnote{Without loss of generality, here we assume there are two modalities and each modality has $N$ points.} similar to \mbox{BRE}, we define hash functions \wrt the $m$th bit for $\x\in\mathcal{X}$ and $\y\in\mathcal{Y}$, respectively, as follows,
+%\begin{align}
+%h_{m}(\x) = \frac{1+\sgn\left(\sum_{q=1}^{Q}W_{x}(m,q)\kappa(\x_q,\x)\right)}{2} \ \ \mbox{or} \ \ g_{m}(\x) = \frac{1+\sgn\left(\sum_{q=1}^{Q}W_{y}(m,q)\kappa(\y_q,\y)\right)}{2}\nonumber,
+%\end{align}
+%where $\W_{x}$ and $\W_{y}$ are two $M\times Q$ projection matrices, $\{\x_q\}_{q=1}^{Q}\subset\mathcal{X}$ and $\{\y_q\}_{q=1}^{Q}\subset\mathcal{Y}$ are landmark points for $\mathcal{X}$ and $\mathcal{Y}$ respectively, and $\kappa(\cdot,\cdot)$ is a kernel function. Note that defining hash functions this way is very common in kernel methods and brings us flexibility to work on a wide variety of data types. Therefore, given two points $\x\in\mathcal{X}$ and $\y\in\mathcal{Y}$, we denote their corresponding binary representations as $\tilde{\x}$ and $\tilde{\y}$ such that their $m$th bits can be evaluated by $\tilde{x}(m) = h_{m}(\x)$ and $\tilde{y}(m) = g_{m}(\y)$.
+%
+%Since in many real-world applications, it is much easier to obtain binary pairwise relationships rather than real-valued distance, here we simply define the \textit{original} distance between two points $\x_i,\x_j$ as follows,
+%\begin{align}
+%d(\x_i,\x_j) = \left\{ \begin{array}{ll}
+%0 & \textrm{if $\x_i$ and $\x_j$ belong to the same class};\\
+%1 & \textrm{otherwise},
+%\end{array} \right. \nonumber%\\
+%%d(\y_k,\y_l) = \left\{ \begin{array}{ll}
+%%0 & \textrm{if $\y_k$ and $\y_l$ are similar};\\
+%%1 & \textrm{if $\y_k$ and $\y_l$ are dissimilar},
+%%\end{array} \right. \nonumber\\
+%%%d(\x_i,\x_j) = \frac{1}{2}\|\x_i-\x_j\|^{2}_2, &\tilde{d}(\x_i,\x_j) = \frac{1}{M}\|\tilde{\x}_i-\tilde{\x}_j\|^{2}_2,\nonumber\\
+%%%d(\y_k,\y_l) = \frac{1}{2}\|\y_k-\y_l\|^{2}_2, &\tilde{d}(\y_k,\y_l) = \frac{1}{M}\|\tilde{\y}_k-\tilde{\y}_l\|^{2}_2,\nonumber
+%%d(\x_i,\y_k) = \left\{ \begin{array}{ll}
+%%0 & \textrm{if $\x_i$ and $\y_k$ are similar};\\
+%%1 & \textrm{if $\x_i$ and $\y_k$ are dissimilar},
+%%\end{array} \right. \nonumber
+%\end{align}
+%$d(\y_k,\y_l)$ and $d(\x_i,\y_k)$ are defined similarly. Note that using binary values here to define distance is just a special case, and our model can accept other definitions of distance.
+%
+%We define the \textit{reconstructive} distance between two points as follows,
+%\begin{align}
+%\tilde{d}(\x_i,\x_j) = \frac{1}{M}\|\tilde{\x}_i-\tilde{\x}_j\|^{2}_2, \ \
+%\tilde{d}(\y_k,\y_l) = \frac{1}{M}\|\tilde{\y}_k-\tilde{\y}_l\|^{2}_2, \ \
+%\tilde{d}(\x_i,\y_k) = \frac{1}{M}\|\tilde{\x}_i-\tilde{\y}_k\|^{2}_2.\nonumber
+%\end{align}
+%
+%Intuitively speaking, we try to find $\W_{x},\W_{y}$ such that the reconstructive distance are close to the original distance. More specifically, the goal of \mbox{MBRE} is to minimize the following objective,
+%\begin{align}
+%\mathcal{O}\left(\W_{x},\W_{y}\right)&=\sum_{(\x_i,\x_j)\in\mathcal{N}_{x}}\left(d(\x_i,\x_j)-\tilde{d}(\x_i,\x_j)\right)^{2}+\sum_{(\y_k,\y_l)\in\mathcal{N}_{y}}\left(d(\y_k,\y_l)-\tilde{d}(\y_k,\y_l)\right)^{2}\nonumber\\
+%&+\sum_{(\x_i,\y_k)\in\mathcal{N}_{xy}}\left(d(\x_i,\y_k)-\tilde{d}(\x_i,\y_k)\right)^{2},
+%\label{eqn:totalobj}
+%\end{align}
+%where $\mathcal{N}_{x}$ is a set of point pairs in $\mathcal{X}$, $\mathcal{N}_{y}$ is a set of point pairs in $\mathcal{Y}$ and $\mathcal{N}_{xy}$ is a set of pairs with one point in $\mathcal{X}$ and the other point in $\mathcal{Y}$. In our experiments, there are $k$ pairs for each point and so each set has size upper-bounded by $Nk$.\footnote{The total number of pairs might be smaller than $Nk$, since there might be some duplicate pairs. Besides, different sets may have different $k$ values.}  We note that the objective function of \mbox{BRE} is just the first term of that in Eqn.~(\ref{eqn:totalobj}).
+%
+%
+%%######################################
+%\subsection{Algorithm}
+%To solve the above optimization problem, we adapt the coordinate descent algorithm used in~\cite{kulis2009nips} for our model. The major difference between the adapted algorithm and the original one is threefold: 1) we update all parameters sequentially but the original algorithm randomly updates only a small subset of them;\footnote{Note that original algorithm is slow to converge because of random update.} 2) we use a warm-start approach to improve the convergence rate and obtain better performance; 3) our algorithm involves more updating terms.
+%
+%We first introduce Lemma~\ref{lemma:updatex} as follows.
+%\begin{mylem}
+%Let $\bar{D}_{x}(i,j)=d(\x_i,\x_j)-\tilde{d}(\x_i,\x_j),\bar{D}_{xy}(i,k)=d(\x_i,\y_k)-\tilde{d}(\x_i,\y_k)$. Consider updating one hash function of $\mathcal{X}$ from $h_{o}$ to $h_{n}$, and let $\h_{o}$ and $\h_{n}$ be the $N\times 1$ vectors obtained by applying the old and new hash functions to each data point in $\mathcal{X}$. Furthermore, we denote the hash function of $\mathcal{Y}$ with the same bit index as $g$ and the corresponding binary vector as $\g$. Then the objective function of using $h_{n}$ instead of $h_{o}$ can be expressed as
+%\begin{align}
+%\mathcal{O} &= \sum_{(\x_i,\x_j)\in\mathcal{N}_{x}}\left(\bar{D}_{x}(i,j)+\frac{1}{M}(h_{o}(i)-h_{o}(j))^2-\frac{1}{M}(h_{n}(i)-h_{n}(j))^2\right)^2\nonumber\\
+%&+ \sum_{(\x_i,\y_k)\in\mathcal{N}_{xy}}\left(\bar{D}_{xy}(i,k)+\frac{1-2g(k)}{M}(h_{o}(i)-h_{n}(i))\right)^2+C,
+%\end{align}
+%where $C$ is a constant independent of $h_{o}$ and $h_{n}$.
+%\label{lemma:updatex}
+%\end{mylem}
+%\begin{myproof}
+%Let $\tilde{\D}_{x}^{o}$ and $\tilde{\D}_{x}^{n}$ be the matrices of reconstructive distance using $h_{o}$ and $h_{n}$ respectively, $\H_{o}$ and $\H_{n}$ be the $N\times M$ matrices of old and new hash codes of $\mathcal{X}$ respectively, and $\G$ be the hash codes of $\mathcal{Y}$. Moreover, we use $\1_{t}$ to denote the $t$th standard basis vector and $\1$ to denote a vector of all ones, and their dimensionalities will be clear in the context.
+%
+%We can express $\tilde{\D}_{x}^{o}$ as follows,
+%\begin{align}
+%\tilde{\D}_{x}^{o} = \frac{1}{M}\left(\Ell_{xo}\1^{T}+\1\Ell^T_{o}-2\H_{o}\H_{o}^{T}\right)\nonumber,
+%\end{align}
+%where $\Ell_{xo}$ is the vector of squared norms of the rows of $\H_{o}$. Accordingly, we can express $\Ell_{xn}$ for $\H_{n}$ as $\Ell_{xn} = \Ell_{xo} - \h_{o}+\h_{n}$, since $\h_{o}$ and $\h_{n}$ are binary vectors.
+%Moreover, we can easily obtain $\H_{n} = \H_{o} +(\h_{n}-\h_{o})\1^{T}_{m}$, where $m$ is the index of the hash function being updated. Therefore,
+%\begin{align}
+%\tilde{\D}_{x}^{n}
+%&= \frac{1}{M}\left(\Ell_{xn}\1^{T}+\1\Ell_{xn}^T-2\H_{n}\H_{n}^{T}\right)\nonumber\\
+%&= \frac{1}{M}\left((\Ell_{xo} - \h_{o}+\h_{n})\1^{T}+\1(\Ell_{xo} - \h_{o}+\h_{n})^{T}-2(\H_{o} +(\h_{n}-\h_{o})\1^{T}_{m})(\H_{o} +(\h_{n}-\h_{o})\1^{T}_{m})^{T}\right)\nonumber\\
+%&= \tilde{\D}_{x}^{o}-\frac{1}{M}\left((\h_{o}\1^{T}+\1\h_{o}^{T}-2\h_{o}\h_{o}^{T})-(\h_{n}\1^{T}+\1\h_{n}^{T}-2\h_{n}\h_{n}^{T})\right).\nonumber
+%\end{align}
+%
+%Similarly, we have the following cross-modal reconstructive distance matrix,
+%\begin{align}
+%\tilde{\D}_{xy}^{o} = \frac{1}{M}\left(\Ell_{xo}\1^{T}+\1\Ell_{y}^T-2\H_{o}\G^{T}\right)\nonumber,
+%\end{align}
+%where $\Ell_{y}$ is the vector of squared norms of the rows of $\G$. Therefore,
+%\begin{align}
+%\tilde{\D}_{xy}^{n}
+%&= \frac{1}{M}\left(\Ell_{xn}\1^{T}+\1\Ell_{y}^T-2\H_{n}\G^{T}\right)\nonumber\\
+%&= \frac{1}{M}\left((\Ell_{xo} - \h_{o}+\h_{n})\1^{T}+\1\Ell_{y}^{T}-2(\H_{o} +(\h_{n}-\h_{o})\1^{T}_{m})\G^{T}\right)\nonumber\\
+%&= \tilde{\D}_{x}^{o}-\frac{1}{M}\left((\h_{o}\1^{T}-2\h_{o}\g^{T})-(\h_{n}\1^{T}-2\h_{n}\g^{T})\right).\nonumber
+%\end{align}
+%
+%Thus we can write the objective function of using $h_{n}$ instead of $h_{o}$ as
+%\begin{align}
+%\mathcal{O} &= \sum_{(\x_i,\x_j)\in\mathcal{N}_{x}}\left(\bar{D}_{x}(i,j)+\tilde{D}_{x}^{o}(i,j)-\tilde{D}_{x}^{n}(i,j)\right)^2+\sum_{(\x_i,\y_k)\in\mathcal{N}_{xy}}\left(\bar{D}_{xy}(i,k)+\tilde{D}_{xy}^{o}(i,k)-\tilde{D}_{xy}^{n}(i,k)\right)^2\nonumber\\
+%&=\sum_{(\x_i,\x_j)\in\mathcal{N}_{x}}\left(\bar{D}_{x}(i,j)+\frac{1}{M}(h_{o}(i)-h_{o}(j))^2-\frac{1}{M}(h_{n}(i)-h_{n}(j))^2\right)^2\nonumber\\
+%&+\sum_{(\x_i,\y_k)\in\mathcal{N}_{xy}}\left(\bar{D}_{xy}(i,k)+\frac{1-2g(k)}{M}(h_{o}(i)-h_{n}(i))\right)^2+C,
+%\end{align}
+%where we have made use of $h_{o}(i)^2 = h_{o}(i)$ and $h_{n}(i)^2 = h_{n}(i)$ and grouped terms irrelevant to $h_{o},h_{n}$ into $C$. This completes the proof.
+%\end{myproof}
+%
+%Now we move to the details of updating one element of $\W_{x}$, e.g., $W_{x}(m,q_0)$, with all the other elements in $\W_{x}$ fixed. Given a point $\x_i$, the $m$th hash code can be obtained by computing
+%\begin{align}
+%W_{x}(m,q_0)\kappa(\x_{q_0},\x_i)+\sum\nolimits_{q\neq q_0}W_{x}(m,q)\kappa(\x_{q},\x_i).
+%\label{eqn:threshold-1bit}
+%\end{align}
+%Equating (\ref{eqn:threshold-1bit}) to zero, we can easily obtain the incremental value for $W_{x}(m,q_0)$ that can change the current bit of $\x_i$ as
+%\begin{align}
+%    \delta_{i} = \left(\sum\nolimits_{q\neq q_0}W_{x}(m,q)\kappa(\x_{q},\x_{i})\right)/\kappa(\x_{q_0},\x_{i}) - W_{x}(m,q_0).
+%\end{align}
+%
+%If $h_m(\x_i)>0$, we should decrease $W_{x}(m,q_0)$ to flip the hash code, in another words, $\delta_i<0$. On the contrary, if $h_m(\x_i)<0$, we should increase $W_{x}(m,q_0)$ to flip the hash code, that is, $\delta_i>0$. As a result, we first find all the $\delta_{i}$'s for all $\x_{i}$'s. Then we sort $\{\delta_i\mid\delta_i>0\}$ in ascending order and $\{\delta_i\mid\delta_i<0\}$ in descending order, and thus obtain two sets of intervals. It is easy to observe that, in a fixed interval, changing $W_{x}(m,q_0)$ will not affect the hash code of any point. However, if we go across intervals, the hash code of exactly one point will be changed. As a result, starting from the current value of $W_{x}(m,q_0)$, we first increase it by adding $\delta_i+\epsilon>0$ from the smallest one to the largest one to obtain a set of possible values of objective function~(\ref{eqn:totalobj}). Note that $\epsilon$ is a very small positive number ensuring that only the $i$th bit is flipped. We then decrease $W_{x}(m,q_0)$ by adding $\delta_i-\epsilon<0$ to the starting value from the largest one to the smallest one to obtain another set of possible objective values. In total, we obtain a set of $N$ possible objective values. After getting all these values, we update $W_x(m,q_{0})$ by adding $\delta_i$ corresponding to the smallest objective $\mathcal{O}_i$ if it is smaller than original objective $\mathcal{O}$ before updating, or skip this iteration otherwise.
+%
+%The main idea of updating $W_{x}(m,q_0)$ is to find $\delta_i$ leading to the smallest objective function value.  We can compute the values sequentially in an efficient way based on Lemma~\ref{lemma:updateh}.
+%\begin{mylem}
+%Given two hash vectors $\h_{t}$ and $\h_{t-1}$ for $\mathcal{X}$ which are different in only one position, the objective w.r.t. $\h_{t}$ can be computed from that w.r.t. $\h_{t-1}$ in $O(k)$ time.
+%\label{lemma:updateh}
+%\end{mylem}
+%\begin{myproof}
+%Let the index of the point in which $\h_{t}$ and $\h_{t-1}$ are different be $a$. The only terms that change in the objective are $(\x_a,\x_j)\in\mathcal{N}_{x},(\x_i,\x_a)\in\mathcal{N}_{x}$, and $(\x_a,\y_k)\in\mathcal{N}_{xy}$. Let $f_a = 1$ if $h_{t-1}(a)=0,h_{t}(a)=1$, and $f_a=-1$ otherwise. Therefore the relevant terms in the objective function as given in Lemma~\ref{lemma:updatex} may be written as
+%\begin{align}
+%\mathcal{O}'&=\sum_{(\x_a,\x_j)\in\mathcal{N}_{x}}\left(\bar{D}_{x}(a,j)-\frac{f_a}{M}(1-2h_{t}(j))\right)^2+\sum_{(\x_i,\x_a)\in\mathcal{N}_{x}}\left(\bar{D}_{x}(i,a)-\frac{f_a}{M}(1-2h_{t}(i))\right)^2\nonumber\\
+%&+\sum_{(\x_a,\y_k)\in\mathcal{N}_{xy}}\left(\bar{D}_{xy}(a,k)-\frac{f_a}{M}(1-2g(k))\right)^2.
+%\label{eqn:updateO-1bit}\end{align}
+%
+%Since $\x_{a}$ has $k$ nearest neighbors and lives in the neighborhood of $k$ points on average, it costs $O(k)$ time to update the objective.
+%\end{myproof}
+%
+%We can update each element of $\W_{y}$ similarly with the help of the following two lemmas. %Due to lack of space, we omit the proof here.
+%
+%\begin{mylem}
+%Let $\bar{D}_{y}(k,l)=d(\y_k,\y_l)-\tilde{d}(\y_k,\y_l),\bar{D}_{xy}(i,k)=d(\x_i,\y_k)-\tilde{d}(\x_i,\y_k)$. Consider updating one hash function of $\mathcal{Y}$ from $g_{o}$ to $g_{n}$, and let $\g_{o}$ and $\g_{n}$ be the $N\times 1$ vectors obtained by applying the old and new hash functions to each data point in $\mathcal{Y}$. We further denote the hash function of $\mathcal{X}$ with the same index as $h$ and the corresponding binary vector of $\mathcal{X}$ as $\h$. Then the objective function of using $g_{n}$ instead of $g_{o}$ can be expressed as
+%\begin{align}
+%\mathcal{O} &= \sum_{(\y_k,\y_l)\in\mathcal{N}_{y}}\left(\bar{D}_{y}(k,l)+\frac{1}{M}(g_{o}(k)-g_{o}(l))^2-\frac{1}{M}(g_{n}(k)-g_{n}(l))^2\right)^2\nonumber\\
+%&+ \sum_{(\x_i,\y_k)\in\mathcal{N}_{xy}}\left(\bar{D}_{xy}(i,k)+\frac{1-2h(i)}{M}(g_{o}(k)-g_{n}(k))\right)^2+C',
+%\end{align}
+%where $C'$ is a constant independent of $g_{o}$ and $g_{n}$.
+%\label{lemma:updatey}
+%\end{mylem}
+%
+%\begin{mylem}
+%Given two hash vectors $\g_{t}$ and $\g_{t-1}$ for $\mathcal{Y}$ which are different in only one position, the objective w.r.t. $\g_{t}$ can be computed from that w.r.t. $\g_{t-1}$ in $O(k)$ time.
+%\label{lemma:updateg}
+%\end{mylem}
+%
+%As a result, the general procedure of our algorithm can be summarized as follows. We first initialize model parameters $\W_{x}, \W_{y}$. Then we update each element of $\W_{x}$ based on Lemma~\ref{lemma:updatex}\&\ref{lemma:updateh}, and each element of $\W_{y}$ based on Lemma~\ref{lemma:updatey}\&\ref{lemma:updateg}. This updating procedure iterates until $\W_{x}, \W_{y}$ converge. We then use current values of $\W_{x}, \W_{y}$ as initialization and retrain the model to get better $\W_{x}, \W_{y}$. In our experiments, this warm-start approach is very effective, $\W_{x}, \W_{y}$ will converge very fast to a better local optimum. To update one element of $\W_{x}$ or $\W_{y}$, sorting $N$ incremental values $\delta_i$'s needs $O(N\log N)$ time, obtaining all objective function values needs $O(Nk)$ time and finding the smallest $\mathcal{O}_i$'s needs $O(N)$ time. Putting everything together, the time complexity of updating one element is $O(N\log N+Nk)$. As a result, one full iteration of updating $\W_{x}$ or $\W_{y}$ requires $O(MQN(\log N+k))$ time.
+%
+%%\begin{algorithm}
+%%%\DontPrintSemicolon
+%%%\SetKwData{Left}{left}\SetKwData{This}{this}\SetKwData{Up}{up}
+%%%\SetKwFunction{Union}{Union}\SetKwFunction{FindCompress}{FindCompress}
+%%\SetKwInOut{Input}{Input}\SetKwInOut{Output}{Output}
+%%
+%%\Input{$\mathcal{N}_{x}, \mathcal{N}_{y}, \mathcal{N}_{xy}$.}
+%%\Output{$\W_{x}, \W_{y}$.}
+%%\Begin{
+%%Initialize $\W_{x}, \W_{y}$.
+%%\While{NOT Converge}{
+%%\For{$m=1$ to $M$}{    \For{$q=1$ to $Q$}{ Update $W_{x}(m,q)$.}    }
+%%\For{$m=1$ to $M$}{    \For{$q=1$ to $Q$}{ Update $W_{y}(m,q)$.}    }
+%%}}
+%%\caption{General procedure of coordinate descent}
+%%\label{algo:cmh}
+%%\end{algorithm}
+%
+%Note that local convergence in a finite number of updates is guaranteed since each update will never increase the objective function value which is lower-bounded by zero. Therefore, the algorithm is  efficient and can scale well even for large high-dimensional data sets.
+%
+% % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
+%\section{Multimodal Latent Binary Embeddings}
+%\label{MH:MLBE}
+%
+%Up to now, we have presented two models, namely, \mbox{SMH} and \mbox{MBRE}. To evaluate the data correlation, \mbox{SMH} requires paired or aligned input data which might not be easy to obtain. \mbox{MBRE} eliminates this constraint by directly finding a discrete embedding, so that the Hamming distance in the embedded space maximally approximates the original distance. In this section, we introduce an alternative multimodal hashing model to improve \mbox{SMH}, which is called \textit{multimodal latent binary embeddings} (\mbox{MLBE}), based on latent factor models. \mbox{MLBE} relates hash codes and observations of similarity, i.e., intra-modal similarity and inter-modal similarity, in a probabilistic model, and the hash codes can be learned easily by \mbox{MAP} estimation of the latent factors. %Among other things, \mbox{MLBE} can be easily extended to determine the proper length of hash codes.
+%
+%% the intra-modal and inter-modal similarities are generated based on latent binary factors and weighting matrices. 
+%
+%\subsection{Model}
+%
+%In the following, we focus on the bi-modal case but it is easy to extend \mbox{MLBE} to support multiple modalities. Assume we have binary latent factors for each modality, for example, $ \U \in \{+1,-1\}^{N\times K} $ for $ \X  $ and $ \V \in \{+1,-1\}^{M\times K} $ for $ \Y  $. Correspondingly, we also have two weighting matrices, $\W^{x} \in \mathbb{R}^{K\times K}$ and $ \W^{y}  \in \mathbb{R}^{K\times K}$. The basic assumption of our model is that the observations of intra-modal and inter-modal similarities are determined by the latent factors and weighting matrices. The graphical representation of \mbox{MLBE} is depicted in Figure~\ref{mlbe:fig:model}.
+%
+%\begin{figure}[tb]
+%\centering
+%\epsfig{figure=fig/mlbe/graphmodel, width=0.4\textwidth}
+%\caption{Graphical representation of the model of multimodal latent binary embeddings. The shaded circles are observed variables and the empty ones are latent variables.}
+%\label{mlbe:fig:model}
+%\end{figure}
+%
+%
+%Given $ \U , \V , \W^{x} $ and $ \W^{y} $, the two symmetric intra-modal similarity matrices $ \S^{x} \in \mathbb{R}^{N\times N}$ for  $ \X $ and $ \S^{y} \in \mathbb{R}^{M\times M}$ for $ \Y $ are generated from the following distributions, respectively:
+%$$S^{x}_{ij} \mid \U, \W^{x}  \sim \mathcal{N}(\u_i^T\W^{x}\u_j,\theta_x^2 ), \ \ \forall i \ge j, \  i,j\in\{1,\cdots,N\}, $$
+%$$S^{y}_{ij} \mid \V, \W^{y}  \sim \mathcal{N}(\v_i^T\W^{y}\v_j,\theta_y^2 ), \ \ \forall i \ge j, \  i,j\in\{1,\cdots,M\}, $$
+%where $ \u_i $ and $ \u_j $ denote the $ i $th row and $ j $th row of $ \U  $. Similarly, $ \v_i $ and $ \v_j $ denote the $ i $th row and $ j $th row of $ \V  $.
+%
+%We also observe a inter-modal similarity matrix $ \S^{xy} \in \{1,0\}^{N\times M}$, where 1 and 0 stand for similar and dissimilar, respectively. For example, if an image and a text document are both for a historic event, we label them with 1. If they are irrelevant, we label them with 0. Note that it is quite common and easy to define inter-modal similarity using binary values $ \{1,0\} $ in practice, but our model can also accommodate other values by simply changing the distribution. We further assume only a subset of the inter-modal similarity values are observed and use an indicator matrix $ \O\in \{0,1\}^{N\times M} $ to denote this, i.e., $ O_{ij}=1 $ if $ S_{ij}^{xy} $ is observed and $ O_{ij}=0 $ otherwise. Given $ \U  $ and $ \V  $, the observed elements in $ \S^{xy} $ are generated by
+%$$S^{xy}_{ij} \mid \U, \V  \sim \mbox{Bernoulli}(\sigma(\u_i^{T}\v_j)),\ \ \forall i,j, \ O_{ij}=1,$$
+%where $ \sigma(x) = 1/(1+\exp(-x))$ is the logistic sigmoid function.
+%
+%Assume each element in $ \U\in\{+1,-1\}^{N\times K}  $ is determined identically and independently the following way,\footnote{Conventional the Bernoulli distribution is for $ \{0,1\} $ valued variables. Here, without loss of generality, we can map them to $ \{-1,+1\} $ by linear transformation.}
+%\begin{align}
+%\pi \mid \alpha_u,\beta_u &\sim \mbox{Beta}(\alpha_u,\beta_u),\nonumber\\
+%U_{ik} \mid \pi &\sim \mbox{Bernoulli}(\pi),\nonumber
+%\end{align}
+%where $ \alpha_u $ and $ \beta_u $ are hyperparameters, we can integrate out $ \pi $ to give the following prior on $ \U $:
+%\begin{align}
+%U_{ik} \mid \alpha_u,\beta_u  \sim \mbox{Bernoulli}(\frac{\alpha_u}{\alpha_u+\beta_u}), \ \ \forall i\in\{1,\cdots,N\}, \ k\in\{1,\cdots,K\}.\nonumber
+%\end{align}
+%
+%Similarly, we define the prior on $ \V \in\{+1,-1\}^{M\times K} $ as
+%\begin{align}
+%V_{ik} \mid \alpha_v,\beta_v  \sim \mbox{Bernoulli}(\frac{\alpha_v}{\alpha_v+\beta_v}), \ \ 
+%\forall i\in\{1,\cdots,M\}, \ k\in\{1,\cdots,K\}.\nonumber
+%\end{align}
+%
+%%The prior terms for $ \U  \in \{+1,-1\}^{N\times K}$ and $ \V \in \{+1,-1\}^{M\times K} $ are from ~\cite{griffiths2006nips}:
+%%$$\Pr(\U) = \prod_{k=1}^K\frac{\frac{\alpha}{K}\Gamma(N_k+\frac{\alpha}{K})\Gamma(N-N_k+1)}{\Gamma(N+1+\frac{\alpha}{K})}$$
+%%and
+%%$$\Pr(\V) = \prod_{k=1}^K\frac{\frac{\beta}{K}\Gamma(M_k+\frac{\beta}{K})\Gamma(M-M_k+1)}{\Gamma(M+1+\frac{\beta}{K})},$$
+%%where $ N_k = \sum_{i=1}^{N}\delta(U_{ik}=1) $ and $ M_k = \sum_{i=1}^{M}\delta(V_{ik}=1) $ are the number of $ 1 $'s in the $ k $th column of $ \U  $ and $ \V  $, respectively.
+%
+%For $ \X  $, the entries of the symmetric weight matrix $ \W^{x}\in\mathbb{R}^{K\times K} $ are generated identically and independently by a standard Gaussian distribution:
+%$$\W^{x}_{ij} \mid \phi_x^2  \sim \mathcal{N}(0,\phi_x^2 ), \ \  \forall i\ge j, \ i,j\in\{1,\cdots,K\}.$$
+%We put a similar prior on  $ \W^{y}\in\mathbb{R}^{K\times K} $ for $ \Y  $:
+%$$\W^{y}_{ij} \mid \phi_y^2  \sim \mathcal{N}(0,\phi_y^2 ), \ \ \forall i\ge j, \ i,j\in\{1,\cdots,K\}.$$
+%%We put simple matrix Gaussian prior on $ \W_x $ and $ \W_y $, which can be written as:
+%%$$\Pr(\w_{x}) = \mathcal{N}(\0,\phi_x\I ), \w_{x} = \W_x(:)$$
+%%$$\Pr(\w_y) = \mathcal{N}(\0,\phi_y\I ), \w_y = \W_y(:)$$
+%
+%\subsection{Algorithm}
+%
+%Based on the observations, we can learn the parameters $ \U $ and $ \V $ to give the hash codes. But finding exact posterior distributions of $ \U  $ and $ \V  $ is intractable, as a result, we adopt an alternating algorithm to find an \mbox{MAP} estimation of $ \U , \V ,\W^x $ and $ \W^y  $.
+%
+%We first update $ U_{ik} $ while fixing the others. To decide the \mbox{MAP} estimation of $ U_{ik} $, we first define a loss function with respect to $ U_{ik}$ as in Definition~\ref{def:lossu}:
+%
+%%  $ Let $ \u_i $ be the $ i $th row of $ \U  $, $\w_{x} = \W_x(:) $ and $ \s^{x}_{i} = \S_x(:,i) $, we denote $ \A_i = \mbox{kron}(\u_i, \U) $ and have $ \Pr(\s^{x}_{i}\mid \A,\w_{x}) = \mathcal{N}(\A_i\w_{x},\theta_x\I) $. The loss function of updating one element $ \U_{ik}  $:
+%
+%\begin{mydef}
+%\begin{align}
+%\mathcal{L}_{U_{ik}} &=\log\frac{\alpha_u}{\beta_u}-\frac{1}{2\theta_{x}^2}\sum_{j\neq i}^{N}\left[-2 S^{x}_{ij} \u_j^T\W^x(\u_{i}^{+} - \u_{i}^{-}) - \u_j^T\W^x(\u_{i}^{+}{\u_{i}^{+}}^{T}-\u_{i}^{-}{\u_{i}^{-}}^{T})\W^x\u_j\right]\nonumber\\
+%&+\sum_{j=1}^{M}O_{ij}\left[S_{ij}^{xy}\log \frac{\sigma_{ij}^{+}}{\sigma_{ij}^{-}} + (1-S_{ij}^{xy})\log \frac{1-\sigma_{ij}^{+}}{1-\sigma_{ij}^{-}}\right],
+%\end{align}
+%where $ U_{-ik} $ denotes all the elements in $ \U $ but $ U_{ik} $, $ \s^{x}_i $ denotes the $ i $th row of $ \S^{x} $, $ \u^{+}_i $ is the $ i $th row of $ \U  $ with $ U_{ik}=1 $ and $ \u^{-}_i $ is the $ i $th row of $ \U $ with $ U_{ik}=-1 $. We further define $ \sigma^{+}_{ij} = \sigma(\v_j^T\u_i^{+}) $ and $ \sigma^{-}_{ij} = \sigma(\v_j^T\u_i^{-}) $.
+%\label{def:lossu}\end{mydef}
+%
+%Then we have the following lemma:
+%\begin{mylem}
+%The \mbox{MAP} solution of $ U_{ik} $ is $ U_{ik}=1 $ if $ \mathcal{L}_{U_{ik}}>0 $ and $ U_{ik}=-1 $ otherwise.
+%\label{lemma:updateu}\end{mylem}
+%
+%\begin{myproof}
+%To get the \mbox{MAP} estimation of $ U_{ik} $, we only need to compare the two posterior probabilities $ \Pr(U_{ik}=1) $ and $ \Pr(U_{ik}=-1) $ conditioned on the observations and all the other model parameters. Specifically, we compute the log ratio of the two probabilities which is larger than zero if $ \Pr(U_{ik}=1) > \Pr(U_{ik}=-1)  $ and smaller than zero otherwise. The log ratio can be evaluated as follows:
+%\begin{align}
+% & \log \frac{\Pr(U_{ik} = 1\mid U_{-ik},\V , \W_x, \S^{x}, \S^{xy})}{\Pr(U_{ik} = -1\mid U_{-ik},\V , \W_x, \S^{x}, \S^{xy})}\nonumber\\
+%=& \log \frac{\Pr(U_{ik} = 1\mid \alpha,\beta)}{\Pr(U_{ik} = -1\mid \alpha,\beta)}
+%+\log \frac{\Pr(\s^{x}_i\mid U_{ik}=1, U_{-ik}, \W^{x})}{\Pr(\s^{x}_i\mid U_{ik}=-1, U_{-ik}, \W^{x})}\nonumber\\
+%+&\log \frac{\Pr(\S^{xy}\mid U_{ik}=1, U_{-ik}, \V)}{\Pr(\S^{xy}\mid U_{ik}=-1, U_{-ik}, \V)}\nonumber\\
+%=&\log\frac{\alpha_u}{\beta_u}-\frac{1}{2\theta_{x}^2}\sum_{j\neq i}^{N}\left[-2 S^{x}_{ij} \u_j^T\W^x(\u_{i}^{+} - \u_{i}^{-})\right]\nonumber\\
+%-&\frac{1}{2\theta_{x}^2}\sum_{j\neq i}^{N}\left[\u_j^T\W^x(\u_{i}^{+}{\u_{i}^{+}}^{T}-\u_{i}^{-}{\u_{i}^{-}}^{T})\W^x\u_j\right]\nonumber\\
+%+&\sum_{j=1}^{M}O_{ij}\left[S_{ij}^{xy}\log \frac{\sigma_{ij}^{+}}{\sigma_{ij}^{-}} + (1-S_{ij}^{xy})\log \frac{1-\sigma_{ij}^{+}}{1-\sigma_{ij}^{-}}\right],
+%%-\frac{1}{\theta_x}\left[{\s^{x}_i}^T (\A^{-}_{i} -  \A^{+}_{i} )\w_{x}\right]\nonumber\\
+%%&-\frac{1}{2\theta_x}\left[\w_{x}^T({\A^{+}_{i}}^{T}\A^{+}_{i} - {\A^{-}_{i}}^{T}\A^{-}_{i})\w_{x}\right]\nonumber\\
+%%&-\frac{1}{\mu}\sum_{i,j}I_{ij}\left[S^{xy}_{ij}(\sigma^{-}_{ij}-\sigma^{+}_{ij})+\frac{1}{2}({\sigma^{+}_{ij}}^2-{\sigma^{-}_{ij}}^2)\right],
+%\label{eqn:lossu}\end{align}
+%where $ U_{-ik} $ denotes all the elements in $ \U $ but $ U_{ik} $, $ \s^{x}_i $ denotes the $ i $th row of $ \S^{x} $, $ \u^{+}_i $ is the $ i $th row of $ \U  $ with $ U_{ik}=1 $ and $ \u^{-}_i $ is the $ i $th row of $ \U $ with $ U_{ik}=-1 $. We further define $ \sigma^{+}_{ij} = \sigma(\v_j^T\u_i^{+}) $ and $ \sigma^{-}_{ij} = \sigma(\v_j^T\u_i^{-}) $.
+%
+%The log ratio computed in Eqn.~(\ref{eqn:lossu}) gives exactly $ \mathcal{L}_{U_{ik}} $, hence the proof is completed.
+%\end{myproof}
+%
+%%The details can be found in Appendix.
+%
+%%We group all the terms irrelevant to $ U_{ik} $ in $ C $.
+%
+%%$ N_{-ik} = \sum_{j\neq i}\delta(U_{jk}=1)$ is the number of $ +1 $ in $ k $th column and all rows but the $ i $th row and $ I_{ij}=1 $ if $ \S^{xy}_{ij} $ is observed and  $ I_{ij}= 0 $ otherwise. We define $ \A^{+}_{i} = \mbox{kron}(\u_i,\U ) $ and $ \sigma^{+}_{ij} = \sigma(\u_i^T\v_j) $ with $ U_{ik}=1 $. We define $ \A^{-}_{i} = \mbox{kron}(\u_i,\U ) $ and $ \sigma^{-}_{ij} = \sigma(\u_i^T\v_j) $ with $ U_{ik}=-1 $.
+%
+%%
+%%$ (\hat{\u}_1-\hat{\u}_2)\w_x\S_x\nonumber\\&+(\hat{\u}_1(\W_x^T\W_x))(\hat{\u}_1-\hat{\u}_2)\nonumber\\& + (\hat{\u}_2(\W_x^T\W_x))(\hat{\u}_1-\hat{\u}_2)\nonumber\\& +\sum_{j}I_{ij}(S_{ij}-\sigma(\u_i^{T}\v_j)q)^2 $
+%%We can easily evaluate loss function~(\ref{eqn:loss_u}) and set
+%%\begin{align}
+%%U_{ik} = \left\{ \begin{array}{ll}
+%%+1 & \mathcal{L}_{U_{ik}}>0\\
+%%-1 & \mbox{otherwise}
+%%\end{array} \right.
+%%\end{align}
+%
+%Similarly, we have Definition~\ref{def:lossv} and Lemma~\ref{lemma:updatev} for \mbox{MAP} estimation of $ \V $. %Due to space limitations, we omit the proof here.
+%
+%\begin{mydef}
+%\begin{align}
+%\mathcal{L}_{V_{ik}} &=\log\frac{\alpha_v}{\beta_v}-\frac{1}{2\theta_{y}^2}\sum_{j\neq i}^{N}\left[-2 S^{y}_{ij} \v_j^T\W^y(\v_{i}^{+} - \v_{i}^{-}) - \v_j^T\W^y(\v_{i}^{+}{\v_{i}^{+}}^{T}-\v_{i}^{-}{\v_{i}^{-}}^{T})\W^y\v_j\right]\nonumber\\
+%&+\sum_{j=1}^{N}O_{ji}\left[S_{ji}^{xy}\log \frac{\sigma_{ji}^{+}}{\sigma_{ji}^{-}} + (1-S_{ji}^{xy})\log \frac{1-\sigma_{ji}^{+}}{1-\sigma_{ji}^{-}}\right],
+%\end{align}
+%where $ V_{-ik} $ denotes all the elements in $ \V $ but $ V_{ik} $, $ \s^{y}_i $ denotes the $ i $th row of $ \S^{y} $, $ \v^{+}_i $ is the $ i $th row of $ \V  $ with $ V_{ik}=1 $ and $ \v^{-}_i $ is the $ i $th row of $ \V $ with $ V_{ik}=-1 $. We further define $ \sigma^{+}_{ji} = \sigma(\u_j^T\v_i^{+}) $ and $ \sigma^{-}_{ji} = \sigma(\u_j^T\v_i^{-}) $.
+%\label{def:lossv}\end{mydef}
+%
+%
+%\begin{mylem}
+%The \mbox{MAP} solution of $ V_{ik} $ is $ V_{ik}=1 $ if $ \mathcal{L}_{V_{ik}}>0 $ and $ V_{ik}=-1 $ otherwise.
+%\label{lemma:updatev}\end{mylem}
+%
+%When fixing $ \U , \V  $ and $ \W^{y} $, we compute the \mbox{MAP} estimation of $ \W^{x} $ by maximizing the following loss function:
+%\begin{align}
+%\mathcal{L}_{\W^{x}}&= \log P(\W^{x}) + \log P(\S^{x}_{h}\mid \U ,\W^{x})\nonumber\\
+%&=\sum_{ i\ge j}^{K}\sum_{ j=1}^{K}-\frac{{W^{x}_{ij}}^2}{2\phi_x^2} + \sum_{ i > j}^{N}\sum_{ j=1}^{N}-\frac{1}{2\theta_x^2}(S^{x}_{ij}-\u_i^T\W^x\u_j)^2\nonumber\\
+%&=-\frac{1}{4\phi_x^2}\w_{x}^T(\I + \mbox{diag}(\m) )\w_{x}
+%-\frac{1}{2\theta_x^2}\left[(\s^{x}_h-\A_h\w_x)^T(\s^{x}_h-\A_h\w_x)\right]\nonumber\\
+%&= -\frac{1}{2}\w_{x}^T \left(\A_h^T\A_h +\frac{\theta^2_x}{4\phi^2_x}\left(\I + \mbox{diag}(\m) \right) \right)\w_{x}
+% + \w_{x}^T\A^T_h \s_h^x+C'
+%\label{eqn:loss_wx}\end{align}
+%where $ \w_x  $ is a $ K^2 $-dimensional column vector taken column-wise from $ \W^x $, $ \m $ is a $ K^2 $-dimensional indicator vector in which the value should be 1 if the index corresponds to $ W^{x}_{ii},i=1,\cdots,K $ and 0 otherwise.
+%Let $ \S^{x}_{h} $ denote the left-lower half of $ \S^{x} $ and its vector form be $ \s^{x}_h $. We define $ \A = \U\otimes \U $ and $ \A_h$ consists of the rows corresponding to $ S^x_{ij}, i>j $. We group all the terms irrelevant to $ \W^{x} $ in $ C' $.\footnote{Here we have used a property of Kronnecker multiplication: $ \u^T \W \v = \w^T(\u\otimes\v)  $ where $ \w $ is a column-wise vector of $ \W $ if $ \W $ is a symmetric matrix.}
+%
+%% $ \s^x = \S_x(:) $, we have $ \Pr(\s^x\mid \A,\w_{x}) = \mathcal{N}(\A\w_{x},\theta_x\I) $. The loss function of updating $ \w_{x} $ is:
+%%\begin{align}
+%%\mathcal{L}_x = -\frac{1}{2}\w_{x} (\A^T\A +\frac{\theta_x}{\phi_x}\I )\w_{x} + \s^x\A \w_{x},
+%%\end{align}
+%\begin{mylem}
+%The \mbox{MAP} estimation of $\W^{x}$ can be evaluated by:
+%\begin{align}
+%\w_{x} =\left(\A_h^T\A_h +\frac{\theta^2_x}{4\phi^2_x}\left(\I + \mbox{diag}(\m) \right)\right)^{-1}\A_h^T \s^x. \nonumber
+%\end{align}
+%\label{lemma:updatewx}
+%\end{mylem}
+%
+%Note that Lemma~\ref{lemma:updatewx} can be easily proved by setting the derivative of $ \mathcal{L}_{\W^{x}} $ with respect to $ \w_{x} $ to zero.\footnote{We can adopt gradient-based algorithms to find this global maximum, which may be much faster.} Similarly, we have Lemma~\ref{lemma:updatewy} for $ \W^{y} $.
+%
+%\begin{mylem}
+%The \mbox{MAP} estimation of $\W^{y}$ can be evaluated by:
+%\begin{align}
+%\w_{y} =\left(\B_h^T\B_h +\frac{\theta^2_y}{4\phi^2_y}\left(\I + \mbox{diag}(\m) \right)\right)^{-1}\B_h^T \s^y,\nonumber
+%\end{align}
+%where $ \w_y  $ is a $ k^2 $-dimensional column vector taken column-wise from $ \W^y $, $ \m $ is a $ k^2 $-dimensional indicator vector in which the value should be 1 if the index corresponds to $ W^{y}_{ii},i=1,\cdots,K $ and 0 otherwise.
+%Let $ \S^{y}_{h} $ denote the left-lower half of $ \S^{y} $ and its vector form be $ \s^{y}_h $. We define $ \B = \V\otimes \V $ and $ \B_h$ consists of the rows corresponding to $ S^y_{ij}, i>j $.
+%\label{lemma:updatewy}
+%\end{mylem}
+%
+%%We can update $ \W^{y} $ similarly.\footnote{Updating $ \W^{x} $ and $ \W^{y} $ needs playing with a very large matrix  $ \A_h$ which might not be handled in Matlab, so we use a small but sufficient reference set in $ \X $ and $ \Y  $ to learn $ \W^{x} $ and $ \W^{y} $ and fix them to learn $ \U  $ and $ \V $ for the whole database.}
+%
+%%Similarly, we have $ \w_y =(\B^T\B +\frac{\theta_y}{\phi_y}\I )^{-1}\B^T \s_y $, where $ \B = \mbox{kron}(\V, \V) , \w_y = \W_y(:) $ and $ \s^y = \S_y(:) $.
+%
+%
+%%The algorithm should work as follows:
+%%1 use training data to get Wx, Wy and U, V.
+%%2 fix Wx, Wy and U, V for a reference set, we then paralelly update the U and V in the test set. Each update is conducted iteratively for the elements in U or V, should be converge very fast.
+%%3 use the code to do retrieval.
+%
+%We summarize the algorithm of \mbox{MLBE} in Algorithm~\ref{algorithm:mlbe}. In our experiments, we use the log likelihood to determine the convergence.
+%
+%\begin{algorithm}[!t]
+%%\DontPrintSemicolon
+%%\SetKwData{Left}{left}\SetKwData{This}{this}\SetKwData{Up}{up}
+%%\SetKwFunction{Union}{Union}\SetKwFunction{FindCompress}{FindCompress}
+%\SetKwInOut{Input}{Input}\SetKwInOut{Output}{Output}
+%\Input{$\S_{x}$, $\S_{y}$, $\S_{xy}$ -- similarity matrices
+%\\ $\O_{xy}$ -- similarity matrices
+%\\ $M$ -- number of hash functions
+%\\ $\theta_x,\theta_y, \phi_x,\phi_y, \alpha_u,\alpha_v, \beta_u, \beta_v$ -- regularization parameters}
+%\Begin{
+%\textit{Training phase}:\\
+%   Initialize $ \U  $ and $ \V  $ with $ \{-1,+1\}$ of equal probability.
+%   \While{not converge}{
+%   Update each element of $ \W_x $ sequentially using Lemma~\ref{lemma:updatewx}.
+%   Update $ \U  $ using Lemma~\ref{lemma:updateu}.
+%   Update each element of $ \W_y $ sequentially using Lemma~\ref{lemma:updatewy}.
+%   Update $ \V $ using Lemma~\ref{lemma:updatev}.
+%   }
+%\textit{Testing phase}:\\
+%   Obtain hash codes of points $\x^{*}$ and $\y^{*}$ using Lemma~\ref{lemma:updateu} and Lemma~\ref{lemma:updatev}, respectively.
+%}
+%\caption{Algorithm of \mbox{MLBE}}
+%\label{algorithm:mlbe}
+%\end{algorithm}
+%
+%%\subsection{Complexity Analysis}
+%%-------------------------------------------------------------------------
+%
+%%\section{Max margin multimodal hashing}
+%%\label{MH:MMMH}
+%%
+%%In this section, we introduce a new model that utilize the idea of margin, which is equivalent to hinge loss. The key challenge is how to define margin in multimodal setting. And how to optimize. It will be the best if we can find some convex formulation. Nevertheless, we can use CCCP to achieve some global optimality. This should also be inspired from other embedding algorithms.
+%
+
+\section{Multimodal Latent Binary Embedding}
+\label{mlbe:model}
+
+%We present \mbox{MLBE} in detail in this section.  We use boldface uppercase and lowercase letters to denote matrices and vectors, respectively.  For a matrix $\A$, its $(i,j)$th element is denoted by $A_{ij}$.
+
+%*******************************************************************************
+\subsection{Model Formulation}
+
+For simplicity of our presentation, we focus exclusively on the bimodal case in this chapter, but it is very easy to extend MLBE for more than two modalities. As a running example, we assume that the data come from two modalities $\mathcal{X}$ and $\mathcal{Y}$ corresponding to the image modality and text modality, respectively.
+
+The observations in MLBE are intra-modality and inter-modality similarities.  Specifically, there are two symmetric intra-modality similarity matrices $\S^{x}\in\mathbb{R}^{I\times I}$ and $\S^{y}\in\mathbb{R}^{J\times J} $, where $I$ and $J$ denote the number of data points in modality $\mathcal{X}$ and that in modality $\mathcal{Y}$, respectively.  In case the observed data are only available in the form of feature vectors, different ways can be used to convert them into similarity matrices.  For the image data $\mathcal{X}$, the similarities in $\S^{x}$ could be computed from the corresponding Euclidean distances between feature vectors.  For the text data $\mathcal{Y}$, the similarities in $\S^{y}$ could be the cosine similarities between bag-of-words representations.
+
+In addition, there is an inter-modality similarity matrix $\S^{xy} \in \{1,0\}^{I\times J}$, where 1 and 0 denote similar and dissimilar relationships, respectively, between the corresponding entities.  Note that it is common to specify cross-modality similarities this way, because it is very difficult if not impossible to specify real-valued cross-modality similarities objectively.  The binary similarity values in $\S^{xy}$ can often be determined based on their semantics.  Take multimedia retrieval for example, if an image and a text article are both for the same historic event, their similarity will be set to 1.  Otherwise, their similarity will be 0.
+
+%Take another example in medical image analysis, images obtained from different measures may have similarity 1 if they are taken from the same part of the same patient, and have similarity 0 otherwise.
+
+Our probabilistic generative model has latent variables represented by several matrices.  First, there are two sets of binary latent factors, $\U \in \{+1,-1\}^{I\times K}$ for $\mathcal{X}$ and $\V \in \{+1,-1\}^{J \times K}$ for $\mathcal{Y}$, where each row in $\U$ or $\V$ corresponds to one data point and can be interpreted as the hash code of that point.  In addition, there are two intra-modality weighting matrices, $\W^{x} \in \mathbb{R}^{K\times K}$ for $\mathcal{X}$ and $\W^{y} \in \mathbb{R}^{K\times K}$ for $\mathcal{Y}$, and an inter-modality weighting variable $w>0$.  The basic assumption of \mbox{MLBE} is that the observed intra-modality and inter-modality similarities are generated from the binary latent factors, intra-modality weighting matrices and inter-modality weighting variable.  Note that the real-valued weighting matrices and weighting variable are needed for generating the similarities because the values in the latent factors $\U$ and $\V$ are discrete.
+
+\begin{figure}[t]
+\centering
+\epsfig{figure=fig/mlbe/mlbe_model, width=0.7\textwidth}
+%\vspace{-0.2cm}
+\caption{Graphical model representation of \mbox{MLBE}}
+\label{mlbe:fig:model}
+%\vspace{-0.5cm}
+\end{figure}
+
+The graphical model representation of \mbox{MLBE} is depicted in Figure~\ref{mlbe:fig:model}, in which shaded nodes are used for observed variables and empty ones for latent variables as well as parameters which are also defined as random variables.  The others are hyperparameters, which will be denoted collectively by $\Omega$ in the sequel for notational convenience.
+
+We first consider the likelihood functions of \mbox{MLBE}. Given $\U, \V, \W^{x}, \W^{y}, \theta_{x}$ and $\theta_{y}$, the conditional probability density functions of the intra-modality similarity matrices $\S^{x}$ and $\S^{y}$ are defined as
+\begin{align}
+p(\S^{x} \mid \U, \W^{x},\theta_{x}) &= \prod\limits_{i=1}^{I}\prod\limits_{i'=1}^{I} \mathcal{N}(S^{x}_{ii'}\mid \u_i^T\W^{x}\u_{i'},\frac{1}{\theta_x} ),\nonumber\\
+p(\S^{y} \mid \V, \W^{y}, \theta_y) &=  \prod\limits_{j=1}^{J}\prod\limits_{j'=1}^{J} \mathcal{N}(S^{y}_{jj'}\mid \v_j^T\W^{y}\v_{j'},\frac{1}{\theta_y} ), \nonumber
+\end{align}
+where $ \u_i $ and $ \u_{i'} $ denote the $ i $th and $ i' $th rows of $ \U  $, $ \v_i $ and $ \v_{j'} $ denote the $ j $th and $ j' $th rows of $ \V  $, and $\mathcal{N}(x\mid \mu, \sigma^2)$ is the probability density function of the univariate Gaussian distribution with mean $\mu $ and variance $\sigma^2$.
+
+Given $ \U, \V  $ and $w$, the conditional probability mass function of the inter-modality similarity matrix $\S^{xy}$ is given by
+\begin{align}
+p(\S^{xy}\mid \U, \V, w ) = \prod\limits_{i=1}^{I}\prod\limits_{j=1}^{J} \left[\mbox{Bern}(S^{xy}_{ij}\mid\gamma(w\u_i^{T}\v_j))\right]^{O_{ij}},\nonumber
+\end{align}
+where $ \mbox{Bern}(x\mid \mu) $ is the probability mass function of the \mbox{Bernoulli} distribution with parameter $ \mu $, $O_{ij}$ is an indicator variable which is equal to $ 1 $ if $ S_{ij}^{xy} $ is observed and $ 0 $ otherwise, and $ \gamma(x) = 1/(1+\exp(-x))$ is the logistic sigmoid function to ensure that the parameter $\mu$ of the Bernoulli distribution is in the range $(0,1)$.
+
+To complete the model formulation, we also need to define prior distributions on the latent variables and hyperprior distributions on the parameters.  For the matrix $\U$, we impose a prior independently and identically on each element of $\U$ as follows:\footnote{Conventionally, the Bernoulli distribution is defined for discrete random variables which take the value 1 for success and 0 for failure.  Here, the discrete random variables take values from $\{-1,+1\}$ instead assuming an implicit linear mapping from $\{0,1\}$.}
+\begin{align}
+p(U_{ik} \mid \pi_{ik})&=\mbox{Bern}(U_{ik}\mid\pi_{ik}),\nonumber\\
+p(\pi_{ik} \mid \alpha_u,\beta_u) &= \mbox{Beta}(\pi_{ik}\mid\alpha_u,\beta_u),\nonumber
+\end{align}
+where $\mathrm{Beta}(\mu\mid a,b)$ is the probability density function of the \mbox{beta} distribution with hyperparameters $a$ and $b$. This particular choice is mainly due to the computational advantage of using conjugate distributions so that we can integrate out $ \pi_{ik} $, as a form of Bayesian averaging, to give the following prior distribution on $ \U $:
+\begin{align}
+p(\U \mid \alpha_u,\beta_u) = \prod\limits_{i=1}^{I}\prod\limits_{k=1}^{K}\mbox{Bern}(U_{ik}\mid \frac{\alpha_u}{\alpha_u+\beta_u}).\nonumber
+\end{align}
+Similarly, we define the prior distribution on $\V$ as:
+\begin{align}
+p(\V \mid \alpha_v,\beta_v) = \prod\limits_{j=1}^{J}\prod\limits_{k=1}^{K} \mbox{Bern}(V_{jk} \mid\frac{\alpha_v}{\alpha_v+\beta_v}). \nonumber
+\end{align}
+
+For the weighting matrices $\W^{x}$ and $\W^{y}$, we impose Gaussian prior distributions on them:
+\begin{align}
+p(\W^{x} \mid \phi_x)  &= \prod\limits_{k=1}^{K}\prod\limits_{d=k}^{K} \mathcal{N}(W^{x}_{kd} \mid 0,\frac{1}{\phi_x}),\nonumber\\
+p(\W^{y} \mid \phi_y)  &=\prod\limits_{k=1}^{K}\prod\limits_{d=k}^{K} \mathcal{N}(W^{y}_{kd} \mid 0,\frac{1}{\phi_y}).\nonumber
+\end{align}
+
+The weighting variable $w$ has to be strictly positive to enforce a positive relationship between the inner product of two hash codes and the inter-modality similarity.  So we impose the half-normal prior distribution on $w$:
+\begin{align}
+p(w \mid \phi)  = \mathcal{HN}(w \mid \phi) = e^{-\frac{\phi}{2}w^2}\sqrt{\frac{2\phi}{\pi}}.\nonumber
+\end{align}
+
+Because the parameters $\theta_x, \theta_y, \phi_x, \phi_y$ and $\phi$ are all random variables, we also impose hyperprior distributions on them.  The gamma distribution is used for all these distributions:
+\begin{align}
+p(\theta_x\mid a_{\theta},b_{\theta}) &= \mbox{Gam}(\theta_x\mid a_{\theta},b_{\theta}),\nonumber\\
+p(\theta_y\mid c_{\theta},d_{\theta}) &= \mbox{Gam}(\theta_y\mid c_{\theta},d_{\theta}),\nonumber\\
+p(\phi_x\mid a_{\phi},b_{\phi}) &= \mbox{Gam}(\phi_x\mid a_{\phi},b_{\phi}),\nonumber\\
+p(\phi_y\mid c_{\phi},d_{\phi}) &= \mbox{Gam}(\phi_y\mid c_{\phi},d_{\phi}),\nonumber\\
+p(\phi\mid e_{\phi}, f_{\phi}) &= \mbox{Gam}(\phi\mid e_{\phi},f_{\phi}),\nonumber
+\end{align}
+where $\mbox{Gam}(\tau\mid a,b) = \frac{1}{\Gamma(a)}b^a\tau^{a-1}e^{-b\tau}$ denotes the probability density function of the gamma distribution with hyperparameters $a$ and $b$, and $\Gamma(\cdot)$ is the gamma function.
+
+%*******************************************************************************
+\subsection{Learning}
+
+With the probabilistic graphical model formulated in the previous subsection, we can now devise an algorithm to learn the binary latent factors $\U$ and $\V$ which give the hash codes we need.  A fully Bayesian approach would infer the posterior distributions of $\U$ and $\V$, possibly using some sampling techniques.  However, such methods are often computationally demanding.  For computational efficiency, we devise an efficient alternating learning algorithm in this paper based on MAP estimation.
+
+
+We first update $ U_{ik} $ while fixing all other variables. To find the \mbox{MAP} estimate of $ U_{ik} $, we define a loss function with respect to $ U_{ik}$ in Definition~\ref{def:lossu}:
+\begin{mydef}
+\begin{align}
+\mathcal{L}_{ik} =&-\frac{\theta_{x}}{2}\sum_{l\neq i}^{I}\left[\left(S^{x}_{il}-\u_l^T\W^x\u_{i}^{+}\right)^2-\left(S^{x}_{il}-\u_l^T\W^x\u_{i}^{-}\right)^2\right]\nonumber\\
+&-\frac{\theta_{x}}{2}\left[\left(S^{x}_{ii}-{\u_{i}^{+}}^T\W^x\u_{i}^{+}\right)^2-\left(S^{x}_{ii}-{\u_{i}^{-}}^T\W^x\u_{i}^{-}\right)^2\right]\nonumber\\
+&+\sum_{j=1}^{J}O_{ij}\left[S_{ij}^{xy}\log \frac{\rho_{ij}^{+}}{\rho_{ij}^{-}} + (1-S_{ij}^{xy})\log \frac{1-\rho_{ij}^{+}}{1-\rho_{ij}^{-}}\right]+\log\frac{\alpha_u}{\beta_u},\nonumber
+\end{align}
+where $ \u^{+}_i $ is the $ i $th row of $ \U  $ with $ U_{ik}=1 $, $ \u^{-}_i $ is the $ i $th row of $ \U $ with $ U_{ik}=-1 $, $ \rho^{+}_{ij} = \gamma(w\v_j^T\u_i^{+}) $, and $ \rho^{-}_{ij} = \gamma(w\v_j^T\u_i^{-}) $.
+\label{def:lossu}\end{mydef}
+
+With $ \mathcal{L}_{ik} $, we can state the following theorem: %\footnote{*** You have a few theorems but no theorem.  Note that theorems are intermediate steps for theorems.}
+\begin{mythe}
+The \mbox{MAP} solution of $ U_{ik} $ is equal to 1 if $ \mathcal{L}_{ik}\ge 0 $ and $-1$ otherwise.
+\label{theorem:updateu}\end{mythe}
+\begin{myproof}
+To obtain the \mbox{MAP} solution of $ U_{ik} $, it suffices to compare the following two posterior probabilities:
+\begin{align}
+p_{+} &= \Pr(U_{ik}=1\mid U_{-ik},\V , \W^{x}, w,\S^{x}, \S^{xy},\theta_{x}),\nonumber\\
+p_{-} &= \Pr(U_{ik}=-1 \mid U_{-ik},\V , \W^{x}, w,\S^{x}, \S^{xy},\theta_{x}).\nonumber
+\end{align}
+Specifically, we compute the log ratio of the two probabilities, which is larger than or equal to zero if $ p_{+} \ge p_{-} $ and smaller than zero otherwise. The log ratio can be evaluated as follows:
+\begin{align}
+\lefteqn{\log \frac{\Pr(U_{ik} = 1\mid U_{-ik},\V , \W^{x}, w,\S^{x}, \S^{xy},\theta_{x})}{\Pr(U_{ik} = -1\mid U_{-ik},\V , \W^{x}, w \S^{x}, \S^{xy},\theta_{x})}}\nonumber\\ & \ \ \ \ \ \ 
+= \log \frac{\Pr(\S^{x}\mid U_{ik}=1, U_{-ik}, \W^{x},\theta_{x})}{\Pr(\S^{x}\mid U_{ik}=-1, U_{-ik}, \W^{x},\theta_{x})}\nonumber\\ & \ \ \ \ \ \ 
++\log \frac{\Pr(\S^{xy}\mid U_{ik}=1, U_{-ik}, w,\V)}{\Pr(\S^{xy}\mid U_{ik}=-1, U_{-ik}, w,\V)}\nonumber\\& \ \ \ \ \ \ 
++ \log \frac{\Pr(U_{ik} = 1\mid \alpha_{u},\beta_{u})}{\Pr(U_{ik} = -1\mid \alpha_{u},\beta_{u})}
+\nonumber\\ & \ \ \ \ \ \ 
+=-\frac{\theta_{x}}{2}\sum_{l\neq i}^{I}\left[\left(S_{il}-\u_l^T\W^x\u_{i}^{+}\right)^2-\left(S_{il}-\u_l^T\W^x\u_{i}^{-}\right)^2\right]\nonumber\\ & \ \ \ \ \ \ 
+-\frac{\theta_{x}}{2}\left[\left(S_{ii}-{\u_{i}^{+}}^T\W^x\u_{i}^{+}\right)^2-\left(S_{ii}-{\u_{i}^{-}}^T\W^x\u_{i}^{-}\right)^2\right]\nonumber\\ & \ \ \ \ \ \ 
++\sum_{j=1}^{J}O_{ij}\left[S_{ij}^{xy}\log \frac{\rho_{ij}^{+}}{\rho_{ij}^{-}} + (1-S_{ij}^{xy})\log \frac{1-\rho_{ij}^{+}}{1-\rho_{ij}^{-}}\right]+\log\frac{\alpha_u}{\beta_u}\nonumber,
+\end{align}
+where $ U_{-ik} $ denotes all the elements in $ \U $ except $ U_{ik} $. The log ratio thus computed gives exactly $ \mathcal{L}_{ik} $.  This completes the proof.
+\end{myproof}
+%The proof of Theorem~\ref{theorem:updateu} can be found in Appendix~\ref{appd:proofu}.
+
+Similarly, we have Definition~\ref{def:lossv} and Theorem~\ref{theorem:updatev} for the \mbox{MAP} estimation of $ \V $. The proof of Theorem~\ref{theorem:updatev} is similar and so it is omitted in the paper due to page limitations.
+
+\begin{mydef}
+\begin{align}
+\mathcal{Q}_{jl} =&-\frac{\theta_{y}}{2}\sum_{l\neq j}^{J}\left[\left(S^{y}_{jl}-\v_l^T\W^y\v_{j}^{+}\right)^2-\left(S^{y}_{jl}-\v_l^T\W^y\v_{j}^{-}\right)^2\right]\nonumber\\
+&-\frac{\theta_{y}}{2}\left[\left(S^{y}_{jj}-{\v_{j}^{+}}^T\W^y\v_{j}^{+}\right)^2-\left(S^{y}_{jj}-{\v_{j}^{-}}^T\W^y\v_{j}^{-}\right)^2\right]\nonumber\\
+&+\sum_{i=1}^{I}O_{ij}\left[S_{ij}^{xy}\log \frac{\lambda_{ij}^{+}}{\lambda_{ij}^{-}} + (1-S_{ij}^{xy})\log \frac{1-\lambda_{ij}^{+}}{1-\lambda_{ij}^{-}}\right]+\log\frac{\alpha_v}{\beta_v},\nonumber
+\end{align}
+where $ \v^{+}_j $ is the $ j $th row of $ \V  $ with $ V_{jk}=1 $, $ \v^{-}_j $ is the $ j $th row of $ \V $ with $ V_{jk}=-1 $, $ \lambda^{+}_{ij} = \gamma(w\u_i^T\v_j^{+}) $, and $ \lambda^{-}_{ij} = \gamma(w\u_i^T\v_i^{-}) $.
+\label{def:lossv}\end{mydef}
+
+
+\begin{mythe}
+The \mbox{MAP} solution of $ V_{ik} $ is equal to 1 if $ \mathcal{Q}_{jl}\ge 0$ and $-1$ otherwise.
+\label{theorem:updatev}\end{mythe}
+
+With $ \U , \phi_{x}  $ and $ \theta_{x} $ fixed, we can compute the \mbox{MAP} estimate of $ \W^{x} $ using Theorem~\ref{theorem:updatewx} below. %The proof is in Appendix~\ref{appd:proofw}.
+
+
+\begin{mythe}
+The \mbox{MAP} solution of $\W^{x}$ is
+\begin{align}
+\w^{x} =\left(\A^T\M_2\A +\frac{\phi_x}{\theta_x}\M_1\right)^{-1}\A^T\M_2\s^x, \nonumber
+\end{align}
+where $ \w^{x}  $ is a $ K^2 $-dimensional column vector taken in a columnwise manner from $ \W^x $, $ \s^{x} $ is an $ I^2 $-dimensional column vector taken in a columnwise manner from $ \S^{x} $,  $ \A = \U\otimes \U $, $\M_1$ is a diagonal matrix with each diagonal entry equal to 1 if it is the linear index of the upper-right portion of $\W^{x}$ and 0 otherwise, and $\M_2$ is similarly defined but with a different size which is determined by $\S^{x}$.
+\label{theorem:updatewx}
+\end{mythe}
+\begin{proof}
+The negative log of the posterior distribution of $ \W^{x} $ can be written as:
+\begin{align}
+\label{eqn:loss_wx}
+\lefteqn{-\log p(\W^{x}\mid \S^{x}, \U,\theta_{x},\phi_{x} )} \\ & \ \ \ \ \ 
+=  -\log P(\W^{x}\mid \phi_{x}) - \log P(\S^{x}\mid \U ,\W^{x},\theta_{x}) + \tilde{C}\nonumber\\ & \ \ \ \ \ 
+=\frac{\phi_x}{2}\sum_{ k=1}^{K}\sum_{ d=k}^{K}(W^{x}_{kd})^2 + \frac{\theta_x}{2}\sum_{ i=1}^{I}\sum_{ i'=i}^{I}\left(S^{x}_{ii'}-\u_i^T\W^x\u_{i'}\right)^2+\tilde{C}\nonumber\\ & \ \ \ \ \ 
+=\frac{\phi_x}{2}{\w^{x}}^T\M_1\w^{x}
++\frac{\theta_x}{2}\left(\s^{x}-\A\w^{x}\right)^T\M_2\left(\s^{x}-\A\w^{x}\right)+\tilde{C}\nonumber\\ & \ \ \ \ \ 
+= \frac{1}{2}{\w^{x}}^T \left(\theta_x\A^T\M_2\A+\phi_x\M_1\right)\w^{x}
+-\theta_x {\s^x}^T\M_2\A\w^{x} +\tilde{C},\nonumber
+\end{align}
+%where $ \w^{x}  $ is a $ K^2 $-dimensional column vector taken column-wisely from $ \W^x $, $ \s^{x} $ is a $ I^2 $-dimensional column vector taken column-wisely from $ \S^{x} $, $ \A = \U\otimes \U $, $\M_1$ is a diagonal matrix in which the entries are equal to 1 if they are the linear indices of the upper-right part of $\W^{x}$, and $\M_2$ is defined similar to $\M_1$ but with different size, which is determined by $\S^{x}$.\footnote{*** There is no need to define them again.}
+where $ \tilde{C} $ is a constant term independent of $ \W^{x} $.
+
+
+Setting the derivative of Equation~(\ref{eqn:loss_wx}) to zero, we get
+\begin{align}
+\w^{x} =\left(\A^T\M_2\A +\frac{\phi_x}{\theta_x}\M_1\right)^{-1}\A^T\M_2\s^x. \nonumber
+\end{align}
+This completes the proof.
+\end{proof}
+
+
+Similarly, we have Theorem~\ref{theorem:updatewy} for $ \W^{y} $.
+
+
+\begin{mythe}
+The \mbox{MAP} solution of $\W^{y}$ is
+\begin{align}
+\w^{y} =\left(\B^T\tilde{\M}_2\B +\frac{\phi_y}{\theta_y}\M_1\right)^{-1}\B^T\tilde{\M}_2\s^y,\nonumber
+\end{align}
+%where $ \w^{y}  $ is a $ K^2 $-dimensional column vector taken column-wisely from $ \W^y $, $ \s^{y} $ is a $ J^2 $-dimensional column vector taken column-wisely from $ \S^{y} $, $ \B = \V\otimes \V $ and $\tilde{\M}_2$ is defined similar to $\M_2$ but with different size, which is determined by $\S^{y}$.
+where $\w^{y}, \s^{y}, \B$ and $\tilde{\M}_2$ are also defined similarly.
+\label{theorem:updatewy}
+\end{mythe}
+
+To obtain the \mbox{MAP} estimate of $w$, we minimize the negative log posterior $p(w\mid \U, \V, \S^{xy},\phi)$, which is equivalent to the following objective function:
+\begin{align}
+\mathcal{L}_{w} &= \frac{\phi }{2}w^2-\sum\limits_{i=1}^{I}\sum\limits_{j=1}^{J}\left\{O_{ij}\left[S^{xy}_{ij}\log\lambda_{ij} + \left(1-S^{xy}_{ij}\right)\log\left(1-\lambda_{ij}\right)\right]\right\},\nonumber
+\end{align}
+where $\lambda_{ij} = \gamma\left(w\u_{i}^{T}\v_{j}\right)$.
+
+Although the objective function is convex with respect to $w$, there is no closed-form solution.  Nevertheless, due to its convexity, we can obtain the global minimum easily using a gradient descent algorithm.  The gradient can be evaluated as follows: %\footnote{*** There is an additional (hidden) parameter which is the learning rate of the gradient descent algorithm.}
+\begin{align}
+\label{equation:updatew}
+\nabla w &=\phi \cdot w -\sum\limits_{i=1}^{I}\sum\limits_{j=1}^{J}\left\{O_{ij}\left[S^{xy}_{ij}\left(1-\lambda_{ij}\right)\u_{i}^{T}\v_{j}-\left(1-S^{xy}_{ij}\right)\lambda_{ij}\u_{i}^{T}\v_{j}\right]\right\}.
+\end{align}
+
+As for the parameters, closed-form solutions exist for their \mbox{MAP} estimates which are summarized in the following theorem.
+\begin{mythe}
+\label{theorem:updatehyper}
+The \mbox{MAP} estimates of $\theta_{x},\theta_{y},\phi_{x},\phi_{y}$ and $\phi$ are:
+\begin{align}
+\theta_{x} &=\frac{I(I+1)+4(a_{\theta}-1)}{4b_{\theta}+2\sum\nolimits_{i=1}^{I}\sum\nolimits_{i'=i}^{I}\left(S^{x}_{ii'}-\u_i^{T}\W^{x}\u_{i'}\right)^2},\label{theorem:updatethetax}\\
+\theta_{y} &=\frac{J(J+1)+4(c_{\theta}-1)}{4d_{\theta}+2\sum\nolimits_{j=1}^{J}\sum\nolimits_{j'=j}^{J}\left(S^{y}_{jj'}-\v_j^{T}\W^{y}\v_{j'}\right)^2},\label{theorem:updatethetay}\\
+\phi_{x} &=\frac{K(K+1)+4(a_{\phi}-1)}{4b_{\phi}+2\sum\nolimits_{k=1}^{K}\sum\nolimits_{d=k}^{K}\left(W^{x}_{kd}\right)^2},\label{theorem:updatephix}\\
+\phi_{y} &=\frac{K(K+1)+4(c_{\phi}-1)}{4d_{\phi}+2\sum\nolimits_{k=1}^{K}\sum\nolimits_{d=k}^{K}\left(W^{y}_{kd}\right)^2},\label{theorem:updatephiy}\\
+\phi &=\frac{2e_{\phi}-1}{2f_{\phi}+w^2}.\label{theorem:updatephi}
+\end{align}
+
+\end{mythe}
+
+Theorem~\ref{theorem:updatehyper} can be proved easily. Briefly speaking, we first find the posterior distribution of each parameter and then compute the optimal value by setting its derivative to zero.  Details of the proof are omitted here.
+
+To summarize, the learning algorithm of \mbox{MLBE} is presented in Algorithm~\ref{algorithm:mlbe}.
+
+%, where we use $\Omega = \{\alpha_u,\alpha_v, \beta_u, \beta_v, a_{\phi}, b_{\phi},c_{\phi},d_{\phi},e_{\phi},f_{\phi},a_{\theta},b_{\theta},c_{\theta},d_{\theta}\}$ to denote all the hyperparameters.
+
+\begin{algorithm}[ht]
+\caption{Learning algorithm of \mbox{MLBE}}
+\label{algorithm:mlbe}
+\begin{algorithmic}
+\STATE {\bfseries Input:} \\
+$\S^{x}$, $\S^{y}$, $\S^{xy}$ -- similarity matrices
+\\ $\O$ -- observation indicator variables for $\S^{xy}$
+\\ $K$ -- number of hash functions
+\\ $\Omega$ --  hyperparameters
+\STATE {\bfseries Procedure:} \\
+%\textit{Training stage}:\\
+   \STATE  Initialize all the latent variables and parameters except $ \W^{x},\W^{y} $.
+   \WHILE{not converged}
+   \STATE Update $ \W^{x} $ using Theorem~\ref{theorem:updatewx}.
+   \STATE Update $\phi_x$ using Equation~(\ref{theorem:updatephix}).
+   \STATE Update each element of $ \U  $ using Theorem~\ref{theorem:updateu}.
+   \STATE Update $\theta_x$ using Equation~(\ref{theorem:updatethetax}).
+   \STATE Update $ \W^y $ using Theorem~\ref{theorem:updatewy}.
+   \STATE Update $\phi_y$ using Equation~(\ref{theorem:updatephiy}).
+   \STATE Update each element of $ \V $ using Theorem~\ref{theorem:updatev}.
+   \STATE Update $\theta_y$ using Equation~(\ref{theorem:updatethetay}).
+   \STATE Update $w$ by gradient descent using Equation~(\ref{equation:updatew}).
+   \STATE Update $\phi$ using Equation~(\ref{theorem:updatephi}).
+	\ENDWHILE
+
+\end{algorithmic}
+\end{algorithm}
+\vspace{-0.2cm}
+%*******************************************************************************
+\subsection{Out-of-Sample Extension}
+
+Algorithm~\ref{algorithm:mlbe} tells us how to learn the hash functions for the observed bimodal data based on their intra-modality and inter-modality similarities.  However, the hash codes can only be computed this way for the training data. In many applications, after learning the hash functions, it is necessary to obtain the hash codes for out-of-sample data points as well.  One naive approach would be to incorporate the out-of-sample points into the original training set and then learn the hash functions from scratch.  However, this approach is computationally unappealing due to its high computational cost especially when the training set is large.
+
+In this subsection, we propose a simple yet very effective method for finding the hash codes of out-of-sample points.  The method is based on a simple and natural assumption that the latent variables and parameters for the training data can be fixed while computing the hash codes for the out-of-sample points.
+
+Specifically, we first train the \mbox{MLBE} model using some 
+training data selected from both modalities.\footnote{We do not make any assumption on how the training data are selected.  They may be selected randomly for simplicity or carefully based on how representative they are.  Random selection is used in our experiments.}
+Using the latent variables and parameters learned from the training points, we can find the hash codes for the out-of-sample points by applying Theorem~\ref{theorem:updateu} or Theorem~\ref{theorem:updatev}.  For illustration, Algorithm~\ref{algorithm:mlbe-ext} shows how to compute the hash code for an out-of-sample point $\x^{*}$ from modality $\mathcal{X}$ using the latent variables and parameters learned from two training sets $\hat{\mathcal{X} }$ and $\hat{\mathcal{Y} }$.  It is worth noting that the hash code for each out-of-sample point can be computed independently.  The implication is that the algorithm is highly parallelizable, making it potentially applicable to very large data sets.  The same can also be done to out-of-sample points from the other modality with some straightforward modifications.
+
+%\footnote{*** The terminology mess has not been sorted out: training data, landmark points, landmark sets, out-of-sample points, new point, etc.}
+
+\begin{algorithm}[ht]
+\caption{Algorithm for out-of-sample extension}
+\label{algorithm:mlbe-ext} %
+\begin{algorithmic}
+\STATE {\bfseries Input:} \\
+$\hat{\S}^{x}$ -- intra-modality similarities for $\x^{*}$ and $\hat{\mathcal{X} }$
+\\$\hat{\S}^{xy}$ -- inter-modality similarities for $\x^{*}$ and $\hat{\mathcal{Y} }$
+\\$\hat{\U},\hat{\V},\hat{\W}^{x},\hat{w},\hat{\theta}_x $ -- learned variables
+\\$\alpha_u,\beta_u$ --  hyperparameters
+\STATE {\bfseries Procedure:}
+   \STATE Initialize $ \u^{*}  $.
+   \WHILE{not converged}
+   \STATE Update each element of $ \u^{*}  $ using Theorem~\ref{theorem:updateu}.
+   \ENDWHILE
+
+\end{algorithmic}
+\end{algorithm}
+\vspace{-0.3cm}
+
+%*******************************************************************************
+\subsection{Complexity Analysis}
+
+The computational cost of the above learning algorithm is mainly spent on updating $\U ,\V ,\W^{x}, \W^{y},$ and $w$.
+
+The complexity of updating an entry $U_{ik}$ is $O(IK^{2}+JK)$, which grows linearly with the number of points in each modality. Updating $\W^{x}$ requires inverting a $K^2\times K^2$ matrix. Since $K$ is usually very small, this step can be performed efficiently. The complexity of evaluating the gradient $\nabla w$ is linear in the number of observations of the inter-modality similarities. We note that the complexity can be greatly reduced if the similarity matrices are sparse, which is often the case in real applications.
+
+%*******************************************************************************
+\subsection{Discussion}
+\label{MH:exps:disc}
+Our work is closely related to binary latent factor models~\cite{meeds2006nips,heller2007aistats} but there exist some significant differences.  First, the binary latent factors in MLBE are used as hash codes for multimodal similarity search, while the latent factors in~\cite{meeds2006nips,heller2007aistats} are treated as cluster membership indicators which are used for clustering and link prediction applications. Moreover, the model formulations are very different. In MLBE, the prior distributions on the binary latent factors are simple Bernoulli distributions, but in~\cite{meeds2006nips,heller2007aistats}, the priors on the binary latent factors are Indian buffet processes~\cite{griffiths2005nips}. Furthermore, from a matrix factorization point of view, MLBE simultaneously factorizes multiple matrices but the method in~\cite{meeds2006nips} factorizes only one matrix.
+
+%===============================================================================
+\section{Experiments}
+\label{mlbe:exps}
+
+We first present an illustrative example on synthetic data in Section~\ref{sec:exps:synthetic}.  It is then followed by experiments on two publicly available real-world data sets.  Section~\ref{sec:exps:settings} presents the experimental settings and then Sections~\ref{sec:exps:wiki} and \ref{sec:exps:flickr} present the results.
+
+%Section~\ref{sec:exps:settings} presents the experimental settings. After that, experimental results on two public real data sets are presented and discussed in Section~\ref{sec:exps:wiki} and Section~\ref{sec:exps:flickr}, respectively.
+
+%*******************************************************************************
+\subsection{Illustration on Synthetic Data}
+\label{sec:exps:synthetic}
+
+There are four groups of data points with each group consisting of 50 points.  We associate each group with one of four hash codes, namely, $ [1, 1, -1, -1] $, $ [-1, -1, 1, 1] $, $ [1, -1, 1, -1] $ and $ [-1, 1, -1, 1] $, and use
+a $200\times 4 $ matrix $\H $ to denote the hash codes of all 200 points.  We generate $ \W^{x} $ and $ \W^{y} $ from $ \mathcal{N}(\cdot\mid 1, 0.01) $ and  $ \mathcal{N}(\cdot\mid 5, 0.01) $, respectively.  Based on the latent representation, we generate the similarity matrices $ \S^{x}$ and $ \S^{y} $ using $ \mathcal{N}(S^{x}_{il} \mid \h_{i}^{T}\W^{x}\h_{l}, 0.01) $ and $ \mathcal{N}(S^{y}_{jl} \mid \h_{i}^{T}\W^{y}\h_{l}, 0.01) $, respectively. Moreover, we set $ S^{xy}_{ij} = 1 $ if $  \h_{i}=\h_j $ and $ S^{xy}_{ij} = 0$ otherwise, assuming that all entries in $ \S^{xy}$ are observed, i.e., $ O_{ij} = 1, \forall i,j$.
+
+Based on the similarities generated, we train \mbox{MLBE} to obtain the hash codes $\U$ and $\V$.  Because the bits of the hash codes are interchangeable, it is more appropriate to use inner products of the hash codes to illustrate the similarity structures, as shown in Figure~\ref{mlbe:fig:toy-compare}. Note that the whiter the area is, the more similar the points involved are. Figure~\ref{mlbe:fig:toy:truth} depicts the ground-truth similarity structure, Figure~\ref{mlbe:fig:toy:uu} and~\ref{mlbe:fig:toy:vv} show the learned intra-modality similarity structure for each modality, and Figure~\ref{mlbe:fig:toy:uv} shows the learned inter-modality similarity structure.  As we can see, the whiter areas in the last three subfigures are in the same locations as those in Figure~\ref{mlbe:fig:toy:truth}.  In other words, both the intra-modality and inter-modality similarity structures revealed by the learned hash codes are very close to the ground truth, showing the effectiveness of \mbox{MLBE}. %\footnote{*** I don't know how to interpret properly.  In what sense is it `close'?  If the goal is to learn the hash codes and ground-truth hash codes are available, I wonder if it makes more sense to compare the learned and ground-truth hash codes?}
+
+\begin{figure}[t]
+\subfigure[$\H\H^T$]{\label{mlbe:fig:toy:truth}
+    \begin{minipage}[b]{0.5\linewidth}\vspace{-0.4cm}
+        \centering %\vspace{-1cm}
+        \epsfig{figure=fig/mlbe/synthetic-hh, width=0.8\textwidth} %\vspace{-1.5cm}
+    \end{minipage}}
+\subfigure[$\U\U^T$]{\label{mlbe:fig:toy:uu}
+    \begin{minipage}[b]{0.5\linewidth}\vspace{-0.4cm}
+        \centering %\vspace{-1cm}
+        \epsfig{figure=fig/mlbe/synthetic-uu, width=0.8\textwidth} %\vspace{-1.5cm}
+    \end{minipage}}
+\\\subfigure[$\V\V^T$]{\label{mlbe:fig:toy:vv}
+    \begin{minipage}[b]{0.5\linewidth}\vspace{-0.4cm}
+        \centering %\vspace{-1.5cm}
+        \epsfig{figure=fig/mlbe/synthetic-vv, width=0.8\textwidth} %\vspace{-1.5cm}
+    \end{minipage}}
+\subfigure[$\U\V^T$]{\label{mlbe:fig:toy:uv}
+    \begin{minipage}[b]{0.5\linewidth}\vspace{-0.4cm}
+        \centering %\vspace{-1.5cm}
+        \epsfig{figure=fig/mlbe/synthetic-uv, width=0.8\textwidth} %\vspace{-1.5cm}
+    \end{minipage}}
+\vspace{-0.3cm}
+\caption{Illustration of \mbox{MLBE}}
+\label{mlbe:fig:toy-compare}
+\vspace{-0.4cm}
+\end{figure}
+
+
+%*******************************************************************************
+\subsection{Experimental Settings}
+\label{sec:exps:settings}
+
+We have conducted several comparative experiments on two real-world data sets, which are, to the best of our knowledge, the largest publicly available multimodal data sets that are fully paired and labeled.  Both data sets are bimodal with the image and text modalities but the feature representations are different.  Each data set is partitioned into a database set and a separate query set.
+
+We compare \mbox{MLBE} with \mbox{CMSSH}\footnote{The implementation is kindly provided by the authors.} and \mbox{CVH}\footnote{Because the code is not publicly available, we implemented the method ourselves.} on two common crossmodal retrieval tasks. Specifically, we use a text query to retrieve similar images from the image database and use an image query to retrieve similar texts from the text database. Since the data sets are fully labeled, meaning that each document (image or text) has one or more semantic labels, it is convenient to use these labels to decide the ground-truth neighbors. 
+%All models are trained on the same landmark set random selected from the database set.
+
+We use \textit{mean Average Precision} (\mbox{mAP}) as the performance measure. Given a query and a set of $R$ retrieved documents, the \textit{Average Precision} (\mbox{AP}) is defined as
+\begin{align}
+\mbox{AP} = \frac{1}{L}\sum\nolimits_{r=1}\nolimits^{R} P(r) \, \delta(r),\nonumber
+\end{align}
+where $L$ is the number of true neighbors in the retrieved set, $P(r)$ denotes the precision of the top $r$ retrieved documents, and $\delta(r)=1$ if the $r$th retrieved document is a true neighbor and $\delta(r)=0$ otherwise. We then average the \mbox{AP} values over all the queries in the query set to obtain the \mbox{mAP} measure. The larger the \mbox{mAP}, the better the performance. In the experiments, we set $R=50$.
+
+We also report two types of performance curves, namely, \textit{precision-recall} curve and \textit{recall} curve. Given a query set and a database, both curves can be obtained by varying the Hamming radius of the retrieved points and evaluating the precision, recall and number of retrieved points accordingly.
+
+For \mbox{MLBE}, the intra-modality similarity matrices are computed based on the feature vectors. We first compute the Euclidean distance $d$ between two feature vectors and then transform it into a similarity measure $s = e^{-d^2/2\sigma^2} $, where the parameter $\sigma^2$ is fixed to 1 for both data sets. The inter-modality similarity matrices are simply determined by the class labels. Since \mbox{MLBE} is not sensitive to the hyperparameters, we simply set all of them to 1. Besides, we initialize $\U $ and $\V$ using the results of \mbox{CVH}, set the initial values of $\theta_{x},\theta_{y},\phi_{x},\phi_{y}$ to $0.01$, and use a fixed learning rate $10^{-4}$ for updating $w$.
+
+In all the experiments, the size of the training set, which is randomly selected from the database set for each modality, is set to 300 and only 0.1\% of the random selected entries of $\S^{xy}$ are observed.\footnote{We have tried larger training sets, e.g., of sizes $500$ and $1{,}000$, in our experiments but there is no significant performance improvement. So we omit the results due to space limitations.} To be fair, all three models are trained on the same training set. %\footnote{*** One dimension is missing in the experiments, which is to vary the size of the training/landmark set.}
+
+%*******************************************************************************
+\subsection{Results on \mbox{Wiki} Data Set}
+\label{sec:exps:wiki}
+
+The \mbox{Wiki} data set is generated from a group of $2{,}866$ wikipedia documents provided by~\cite{rasiwasia2010mm}. Each document is an image-text pair and is labeled with exactly one of 10 semantic classes. The images are represented by 128-dimensional \mbox{SIFT}~\cite{lowe2004ijcv} feature vectors.  The text articles are represented by the probability distributions over 10 topics, which are derived from a latent Dirichlet allocation (\mbox{LDA}) model~\cite{blei2003jmlr}. We use 80\% of the data as the database set and the remaining 20\% to form the query set.
+
+%The results of \mbox{CMSSH} are based on 5 repetitions.
+
+The \mbox{mAP} values for \mbox{MLBE} and the two baselines are reported in Table~\ref{mlbe:table:wiki-compare-map}.  The \textit{precision-recall} curves and \textit{recall} curves for the three methods are plotted in Figure~\ref{mlbe:fig:wiki-compare-curve}.
+
+\begin{table}[htb] %\vspace{-0.4cm}
+\caption{\mbox{mAP} comparison on \mbox{Wiki}}\label{mlbe:table:wiki-compare-map}\vspace{-0.5cm}
+\begin{center}
+\begin{tabular}{|c|c|c|c|c|}
+\toprule[1pt]\addlinespace[0pt]
+\multirow{2}{7em}{\centering Task}&\multirow{2}{4em}{\centering Method}&\multicolumn{3}{|c|}{Code Length}\\
+\cline{3-5}
+& &  $K=8$&  $K=16$&  $K=24$\\
+\addlinespace[0pt]\midrule[1pt]\addlinespace[0pt]
+\multirow{3}{7em}{\centering Image Query \\ vs. \\Text Database}
+&\mbox{MLBE}&${\bf 0.3810}$&${\bf0.2561}$&${\bf0.1915}$\\
+\cline{2-5}
+&\mbox{CVH}&${{0.2592}}$&${0.2190}$&${0.1767}$\\
+\cline{2-5}
+&\mbox{CMSSH}&${0.2438}$&${0.2014}$&${0.1757}$\\
+\addlinespace[0pt]\midrule[0.7pt]\addlinespace[0pt]
+\multirow{3}{7em}{\centering Text Query \\ vs. \\Image Database}
+&\mbox{MLBE}&${\bf{0.4955}}$&${\bf0.3209}$&${0.2143}$\\
+\cline{2-5}
+&\mbox{CVH}&${0.3474}$&${0.3094}$&${\bf 0.2576}$\\
+\cline{2-5}
+&\mbox{CMSSH}&${0.2044}$&${0.2286}$&${0.2256}$\\
+\addlinespace[0pt]\bottomrule[1pt]
+\end{tabular}
+\end{center}
+\end{table}
+%\vspace{-0.5cm}
+
+\begin{figure}[htb]
+\subfigure[$K=8$]{
+    \begin{minipage}[b]{0.32\linewidth}\vspace{-0.3cm}
+%        \centering\vspace{-1cm}
+        \epsfig{figure=fig/mlbe/comp-pr-xy-8b, width=1.0\textwidth} %\vspace{-1.5cm}
+    \end{minipage}}
+\subfigure[$K=16$]{
+    \begin{minipage}[b]{0.32\linewidth}\vspace{-0.3cm}
+%        \centering\vspace{-1cm}
+        \epsfig{figure=fig/mlbe/comp-pr-xy-16b, width=1.0\textwidth} %\vspace{-1.5cm}
+    \end{minipage}}
+\subfigure[$K=24$]{
+    \begin{minipage}[b]{0.32\linewidth}\vspace{-0.3cm}
+%        \centering\vspace{-1cm}
+        \epsfig{figure=fig/mlbe/comp-pr-xy-24b, width=1.0\textwidth} %\vspace{-1.5cm}
+    \end{minipage}}
+\\        
+\subfigure[$K=8$]{
+    \begin{minipage}[b]{0.32\linewidth}\vspace{-0.3cm}
+%        \centering\vspace{-1cm}
+        \epsfig{figure=fig/mlbe/comp-pr-yx-8b, width=1.0\textwidth} %\vspace{-1.5cm}
+    \end{minipage}}
+\subfigure[$K=16$]{
+    \begin{minipage}[b]{0.32\linewidth}\vspace{-0.3cm}
+%        \centering\vspace{-1cm}
+        \epsfig{figure=fig/mlbe/comp-pr-yx-16b, width=1.0\textwidth} %\vspace{-1.5cm}
+    \end{minipage}}
+\subfigure[$K=24$]{
+    \begin{minipage}[b]{0.32\linewidth}\vspace{-0.3cm}
+%        \centering\vspace{-1cm}
+        \epsfig{figure=fig/mlbe/comp-pr-yx-24b, width=1.0\textwidth} %\vspace{-1.5cm}
+    \end{minipage}}
+\\
+\subfigure[$K=8$]{
+    \begin{minipage}[b]{0.32\linewidth}\vspace{-0.3cm}
+%        \centering\vspace{-1cm}
+        \epsfig{figure=fig/mlbe/comp-rec-xy-8b, width=1.0\textwidth} %\vspace{-1.5cm}
+    \end{minipage}}
+\subfigure[$K=16$]{
+    \begin{minipage}[b]{0.32\linewidth}\vspace{-0.3cm}
+%        \centering\vspace{-1cm}
+        \epsfig{figure=fig/mlbe/comp-rec-xy-16b, width=1.0\textwidth} %\vspace{-1.5cm}
+    \end{minipage}}
+\subfigure[$K=24$]{
+    \begin{minipage}[b]{0.32\linewidth}\vspace{-0.3cm}
+%        \centering\vspace{-1cm}
+        \epsfig{figure=fig/mlbe/comp-rec-xy-24b, width=1.0\textwidth} %\vspace{-1.5cm}
+    \end{minipage}}
+\\        
+\subfigure[$K=8$]{
+    \begin{minipage}[b]{0.32\linewidth}\vspace{-0.3cm}
+%        \centering\vspace{-1cm}
+        \epsfig{figure=fig/mlbe/comp-rec-yx-8b, width=1.0\textwidth} %\vspace{-1.5cm}
+    \end{minipage}}
+\subfigure[$K=16$]{
+    \begin{minipage}[b]{0.32\linewidth}\vspace{-0.3cm}
+%        \centering\vspace{-1cm}
+        \epsfig{figure=fig/mlbe/comp-rec-yx-16b, width=1.0\textwidth} %\vspace{-1.5cm}
+    \end{minipage}}
+\subfigure[$K=24$]{
+    \begin{minipage}[b]{0.32\linewidth}\vspace{-0.3cm}
+%        \centering\vspace{-1cm}
+        \epsfig{figure=fig/mlbe/comp-rec-yx-24b, width=1.0\textwidth} %\vspace{-1.5cm}
+    \end{minipage}}\vspace{-0.3cm}
+\caption{Precision-recall curves and recall curves on \mbox{Wiki}}
+\label{mlbe:fig:wiki-compare-curve} \vspace{-0.4cm}
+\end{figure}
+
+We can see that \mbox{MLBE} significantly outperforms \mbox{CVH} and \mbox{CMSSH} when the code length is small.  As the code length increases, the performance gap gets smaller. We conjecture that \mbox{MLBE} may get trapped in local minima during the learning process when the code length is too large. %\footnote{*** If this is the case, it is a limitation of the learning algorithm.}
+
+Besides, we observe that as the code length increases, the performance of all three methods degrades.  We note that this phenomenon has also been observed in~\cite{wang2010cvpr,liu2011icml}.  A possible reason is that the learned models will be farther from the optimal solutions when the code length gets larger. %\footnote{*** This sounds weird.  In any case the speculation has not been verified.  Moreover, one may question why this problem does not arise in other matrix factorization methods such as for CF.}
+
+%characteristics of the data.\footnote{*** This sounds vague to me.}
+%In most cases, small code length is good enough.
+%*******************************************************************************
+\subsection{Results on \mbox{Flickr} Data Set}
+\label{sec:exps:flickr}
+
+
+
+
+The \mbox{Flickr} data set consists of $186{,}577$ image-tag pairs, which are pruned from the \mbox{NUS} dataset~\cite{nus-wide-civr09} by keeping the pairs that belong to one of the 10 largest classes. Each pair is annotated by at least one of 10 labels. The image features are 500-dimensional \mbox{SIFT} features and the text features are 1000-dimensional vectors obtained by performing \mbox{PCA} on the original tag occurrence features. We use 99\% of the data as the database set and the remaining 1\% to form the query set.
+
+\begin{table}[ht] %\vspace{-0.4cm}
+\caption{\mbox{mAP} comparison on \mbox{Flickr}}\label{mlbe:table:flickr-compare-map}\vspace{-0.5cm}
+\begin{center}
+\begin{tabular}{|c|c|c|c|c|}
+\toprule[1pt]\addlinespace[0pt]
+\multirow{2}{7em}{\centering Task}&\multirow{2}{4em}{\centering Method}&\multicolumn{3}{|c|}{Code Length}\\
+\cline{3-5}
+& &  $K=8$&  $K=16$&  $K=24$\\
+\addlinespace[0pt]\midrule[1pt]\addlinespace[0pt]
+\multirow{3}{7em}{\centering Image Query \\ vs. \\Text Database}
+&\mbox{MLBE}&${\bf 0.6322}$&${\bf 0.6608 }$&${0.5104}$\\
+\cline{2-5}
+&\mbox{CVH}&${{0.5361}}$&${0.4871}$&${0.4605}$\\
+\cline{2-5}
+&\mbox{CMSSH}&${0.5155}$&${0.5333}$&${\bf 0.5150}$\\
+\addlinespace[0pt]\midrule[0.7pt]\addlinespace[0pt]
+\multirow{3}{7em}{\centering Text Query \\ vs. \\Image Database}
+&\mbox{MLBE}&${\bf{0.5626}}$&${\bf0.5970}$&${0.4296}$\\
+\cline{2-5}
+&\mbox{CVH}&${0.5260}$&${0.4856}$&${\bf 0.4553}$\\
+\cline{2-5}
+&\mbox{CMSSH}&${0.5093}$&${0.4594}$&${0.4053}$\\
+\addlinespace[0pt]\bottomrule[1pt]
+\end{tabular}
+\end{center}
+\end{table}
+%\vspace{-0.4cm}
+
+
+The \mbox{mAP} results are reported in Table~\ref{mlbe:table:flickr-compare-map}. Similar to the results on \mbox{Wiki}, we observe that \mbox{MLBE} outperforms its counterparts by a large margin when the code length is small.
+
+
+
+The corresponding \textit{precision-recall} curves and \textit{recall} curves are plotted in Figure~\ref{mlbe:fig:flickr-compare-curve}.  We note that \mbox{MLBE} has the best overall performance.
+
+
+
+
+\begin{figure}[htb]
+\subfigure[$K=8$]{
+    \begin{minipage}[b]{0.32\linewidth}\vspace{-0.3cm}
+%        \centering\vspace{-1cm}
+        \epsfig{figure=fig/mlbe/flickr-pr-xy-8b, width=1.0\textwidth} %\vspace{-1.5cm}
+    \end{minipage}}
+\subfigure[$K=16$]{
+    \begin{minipage}[b]{0.32\linewidth}\vspace{-0.3cm}
+%        \centering\vspace{-1cm}
+        \epsfig{figure=fig/mlbe/flickr-pr-xy-16b, width=1.0\textwidth} %\vspace{-1.5cm}
+    \end{minipage}}
+\subfigure[$K=24$]{
+    \begin{minipage}[b]{0.32\linewidth}\vspace{-0.3cm}
+%        \centering\vspace{-1cm}
+        \epsfig{figure=fig/mlbe/flickr-pr-xy-24b, width=1.0\textwidth} %\vspace{-1.5cm}
+    \end{minipage}}
+\\    
+\subfigure[$K=8$]{
+    \begin{minipage}[b]{0.32\linewidth}\vspace{-0.3cm}
+%        \centering\vspace{-1cm}
+        \epsfig{figure=fig/mlbe/flickr-pr-yx-8b, width=1.0\textwidth} %\vspace{-1.5cm}
+    \end{minipage}}
+\subfigure[$K=16$]{
+    \begin{minipage}[b]{0.32\linewidth}\vspace{-0.3cm}
+%        \centering\vspace{-1cm}
+        \epsfig{figure=fig/mlbe/flickr-pr-yx-16b, width=1.0\textwidth} %\vspace{-1.5cm}
+    \end{minipage}}
+\subfigure[$K=24$]{
+    \begin{minipage}[b]{0.32\linewidth}\vspace{-0.3cm}
+%        \centering\vspace{-1cm}
+        \epsfig{figure=fig/mlbe/flickr-pr-yx-24b, width=1.0\textwidth} %\vspace{-1.5cm}
+    \end{minipage}}
+\\
+\subfigure[$K=8$]{
+    \begin{minipage}[b]{0.32\linewidth}\vspace{-0.3cm}
+%        \centering\vspace{-1cm}
+        \epsfig{figure=fig/mlbe/flickr-rec-xy-8b, width=1.0\textwidth} %\vspace{-1.5cm}
+    \end{minipage}}
+\subfigure[$K=16$]{
+    \begin{minipage}[b]{0.32\linewidth}\vspace{-0.3cm}
+%        \centering\vspace{-1cm}
+        \epsfig{figure=fig/mlbe/flickr-rec-xy-16b, width=1.0\textwidth} %\vspace{-1.5cm}
+    \end{minipage}}
+\subfigure[$K=24$]{
+    \begin{minipage}[b]{0.32\linewidth}\vspace{-0.3cm}
+%        \centering\vspace{-1cm}
+        \epsfig{figure=fig/mlbe/flickr-rec-xy-24b, width=1.0\textwidth} %\vspace{-1.5cm}
+    \end{minipage}}
+\\
+\subfigure[$K=8$]{
+    \begin{minipage}[b]{0.32\linewidth}\vspace{-0.3cm}
+%        \centering\vspace{-1cm}
+        \epsfig{figure=fig/mlbe/flickr-rec-yx-8b, width=1.0\textwidth} %\vspace{-1.5cm}
+    \end{minipage}}
+\subfigure[$K=16$]{
+    \begin{minipage}[b]{0.32\linewidth}\vspace{-0.3cm}
+%        \centering\vspace{-1cm}
+        \epsfig{figure=fig/mlbe/flickr-rec-yx-16b, width=1.0\textwidth} %\vspace{-1.5cm}
+    \end{minipage}}
+\subfigure[$K=24$]{
+    \begin{minipage}[b]{0.32\linewidth}\vspace{-0.3cm}
+%        \centering\vspace{-1cm}
+        \epsfig{figure=fig/mlbe/flickr-rec-yx-24b, width=1.0\textwidth} %\vspace{-1.5cm}
+    \end{minipage}}\vspace{-0.3cm}
+\caption{Precision-recall curves and recall curves on \mbox{Flickr}}
+\label{mlbe:fig:flickr-compare-curve} %\vspace{-0.4cm}
+\end{figure}
+
+%*******************************************************************************
+%\subsection{Results on \mbox{Flickr1M} Data Set}
+%\label{sec:exps:flickr1m}
+%
+%The data set is described here.
+%
+%
+%
+%
+%The \mbox{mAP} results are reported in Table~\ref{mlbe:table:flickr1m-compare-map}. Similar to the results on \mbox{Wiki}, we observe that \mbox{MLBE} outperforms its counterparts by a large margin when the code length is small.
+%
+%\begin{table}[ht] %\vspace{-0.4cm}
+%\caption{\mbox{mAP} comparison on \mbox{Flickr}}\label{mlbe:table:flickr1m-compare-map}
+%\begin{center}
+%\begin{tabular}{|c|c|c|c|c|}
+%\toprule[1pt]\addlinespace[0pt]
+%\multirow{2}{7em}{\centering Task}&\multirow{2}{4em}{\centering Method}&\multicolumn{3}{|c|}{Code Length}\\
+%\cline{3-5}
+%& &  $K=8$&  $K=16$&  $K=24$\\
+%\addlinespace[0pt]\midrule[1pt]\addlinespace[0pt]
+%\multirow{3}{7em}{\centering Image Query \\ vs. \\Text Database}
+%&\mbox{MLBE}&${\bf 0.6322}$&${\bf 0.6608 }$&${0.5104}$\\
+%\cline{2-5}
+%&\mbox{CVH}&${{0.5361}}$&${0.4871}$&${0.4605}$\\
+%\cline{2-5}
+%&\mbox{CMSSH}&${0.5155}$&${0.5333}$&${\bf 0.5150}$\\
+%\addlinespace[0pt]\midrule[0.7pt]\addlinespace[0pt]
+%\multirow{3}{7em}{\centering Text Query \\ vs. \\Image Database}
+%&\mbox{MLBE}&${\bf{0.5626}}$&${\bf0.5970}$&${0.4296}$\\
+%\cline{2-5}
+%&\mbox{CVH}&${0.5260}$&${0.4856}$&${\bf 0.4553}$\\
+%\cline{2-5}
+%&\mbox{CMSSH}&${0.5093}$&${0.4594}$&${0.4053}$\\
+%\addlinespace[0pt]\bottomrule[1pt]
+%\end{tabular}
+%\end{center}
+%\end{table}
+%%\vspace{-0.4cm}
+%
+%The corresponding \textit{precision-recall} curves and \textit{recall} curves are plotted in Figure~\ref{mlbe:fig:flickr1m-compare-curve}.  We note that \mbox{MLBE} has the best overall performance.
+%
+%
+%
+%
+%\begin{figure}[htb]
+%\subfigure[$K=8$]{
+%    \begin{minipage}[b]{0.32\linewidth}\vspace{-0.3cm}
+%%        \centering\vspace{-1cm}
+%        \epsfig{figure=fig/mlbe/flickr-pr-xy-8b, width=1.0\textwidth} %\vspace{-1.5cm}
+%    \end{minipage}}
+%\subfigure[$K=8$]{
+%    \begin{minipage}[b]{0.32\linewidth}\vspace{-0.3cm}
+%%        \centering\vspace{-1cm}
+%        \epsfig{figure=fig/mlbe/flickr-pr-yx-8b, width=1.0\textwidth} %\vspace{-1.5cm}
+%    \end{minipage}}
+%\subfigure[$K=8$]{
+%    \begin{minipage}[b]{0.32\linewidth}\vspace{-0.3cm}
+%%        \centering\vspace{-1cm}
+%        \epsfig{figure=fig/mlbe/flickr-rec-xy-8b, width=1.0\textwidth} %\vspace{-1.5cm}
+%    \end{minipage}}
+%\subfigure[$K=8$]{
+%    \begin{minipage}[b]{0.32\linewidth}\vspace{-0.3cm}
+%%        \centering\vspace{-1cm}
+%        \epsfig{figure=fig/mlbe/flickr-rec-yx-8b, width=1.0\textwidth} %\vspace{-1.5cm}
+%    \end{minipage}}
+%    \\
+%\subfigure[$K=16$]{
+%    \begin{minipage}[b]{0.32\linewidth}\vspace{-0.3cm}
+%%        \centering\vspace{-1cm}
+%        \epsfig{figure=fig/mlbe/flickr-pr-xy-16b, width=1.0\textwidth} %\vspace{-1.5cm}
+%    \end{minipage}}
+%\subfigure[$K=16$]{
+%    \begin{minipage}[b]{0.32\linewidth}\vspace{-0.3cm}
+%%        \centering\vspace{-1cm}
+%        \epsfig{figure=fig/mlbe/flickr-pr-yx-16b, width=1.0\textwidth} %\vspace{-1.5cm}
+%    \end{minipage}}
+%\subfigure[$K=16$]{
+%    \begin{minipage}[b]{0.32\linewidth}\vspace{-0.3cm}
+%%        \centering\vspace{-1cm}
+%        \epsfig{figure=fig/mlbe/flickr-rec-xy-16b, width=1.0\textwidth} %\vspace{-1.5cm}
+%    \end{minipage}}
+%\subfigure[$K=16$]{
+%    \begin{minipage}[b]{0.32\linewidth}\vspace{-0.3cm}
+%%        \centering\vspace{-1cm}
+%        \epsfig{figure=fig/mlbe/flickr-rec-yx-16b, width=1.0\textwidth} %\vspace{-1.5cm}
+%    \end{minipage}}
+%    \\
+%\subfigure[$K=24$]{
+%    \begin{minipage}[b]{0.32\linewidth}\vspace{-0.3cm}
+%%        \centering\vspace{-1cm}
+%        \epsfig{figure=fig/mlbe/flickr-pr-xy-24b, width=1.0\textwidth} %\vspace{-1.5cm}
+%    \end{minipage}}
+%\subfigure[$K=24$]{
+%    \begin{minipage}[b]{0.32\linewidth}\vspace{-0.3cm}
+%%        \centering\vspace{-1cm}
+%        \epsfig{figure=fig/mlbe/flickr-pr-yx-24b, width=1.0\textwidth} %\vspace{-1.5cm}
+%    \end{minipage}}
+%\subfigure[$K=24$]{
+%    \begin{minipage}[b]{0.32\linewidth}\vspace{-0.3cm}
+%%        \centering\vspace{-1cm}
+%        \epsfig{figure=fig/mlbe/flickr-rec-xy-24b, width=1.0\textwidth} %\vspace{-1.5cm}
+%    \end{minipage}}
+%\subfigure[$K=24$]{
+%    \begin{minipage}[b]{0.32\linewidth}\vspace{-0.3cm}
+%%        \centering\vspace{-1cm}
+%        \epsfig{figure=fig/mlbe/flickr-rec-yx-24b, width=1.0\textwidth} %\vspace{-1.5cm}
+%    \end{minipage}}\vspace{-0.3cm}
+%\caption{Precision-recall curves and recall curves on \mbox{Flickr1M}}\label{mlbe:fig:flickr1m-compare-curve} %\vspace{-0.4cm}
+%\end{figure}
+
+% % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
+\section{Conclusion}
+\label{mlbe:conclusion}
+
+In this chapter, we have proposed a novel probabilistic model, called multimodal latent binary embedding (MLBE), for multimodal hash function learning for graph data.  As a latent factor model, MLBE regards the binary latent factors as hash codes and hence maps data points from multiple modalities to a common Hamming space in a principled manner.  Although finding exact posterior distributions of the latent factors is intractable, we have devised an efficient alternating learning algorithm based on \mbox{MAP} estimation. Experimental results show that MLBE compares favorably with two state-of-the-art models. 
+
+For our future research, we will go beyond the point estimation approach presented in this paper to explore a more Bayesian treatment based on variational inference for enhanced robustness and efficiency. We would also like to extend \mbox{MLBE} to determine the code length $K$ automatically from data.  This is an important yet largely unaddressed issue in existing methods. Moreover, we also plan to apply \mbox{MLBE} to other tasks such as multimodal medical image registration.
+
+%In next chapter, we move forward from graph data to general data and present a new multimodal hashing method.

@@ -1,0 +1,83 @@
+
+\chapter{Conclusion and Future Work}
+\label{chap:conclusion}
+
+%In this chapter, we conclude the whole thesis and propose several possible directions for future pursuit.
+
+%-------------------------------------------------------------------------------
+\section{Conclusion}
+%\label{Conclusion:con}
+
+As a new research topic in the machine learning area, hash function learning has attracted plenty of interest in recent years. Different from locality sensitive hashing methods which design data-independent hash functions for specific similarity measures, hash function learning methods learn data-dependent hash functions directly from the data.
+
+In the present thesis, we explore two research issues in hash function learning, namely, active hashing and multimodal hashing. Active hashing aims to actively select the data from which to learn hash functions, whereas multimodal hashing focuses on learning the hash functions for data involving multiple modalities. The contributions of this thesis are summarized as follows:
+\begin{description}
+\item[Active Hashing] To eliminate the data selection bias and reduce the labeling cost of existing supervised or semi-supervised hash function learning methods, we propose the active hashing framework. Under this framework, the hash functions are learned from the data which are carefully selected before learning. To evaluate the data informativeness, a simple yet effective criterion which is based on uncertainty is proposed. We also present a batch mode algorithm for the data selection procedure. Through extensive experiments, we demonstrate that active hashing outperforms passive hashing by a large margin.
+
+\item[Spectral Multimodal Hashing] To learn hash functions for multimodal data, we propose the spectral multimodal hashing method (\mbox{SMH}). Given that the data in different modalities are aligned, that is, every object has a representation in each modality, \mbox{SMH} learns the hash functions through spectral analysis of modality correlation. Due to its resemblance to canonical correlation analysis in statistics, SMH is easy to extend to support kernel similarity and more than two modalities. We also propose a novel method to learn the thresholds for the hash functions. Experimental results show that our \mbox{SMH} model outperforms the state-of-the-art methods. %However, \mbox{SMH} has an apparent limitation, that is, it is only for the aligned data which may not be available in some applications. In the next chapter, we propose a new multimodal hashing model for graph data which is more general than aligned data.
+
+\item[Multimodal Latent Binary Embedding] For the multimodal data which are organized in similarity graphs, we propose a novel probabilistic model called multimodal latent binary embedding (MLBE) to learn the hash functions. As a latent factor model, MLBE regards the binary latent factors as hash codes and hence maps data points from multiple modalities to a common Hamming space in a principled probabilistic manner. Although finding exact posterior distributions of the latent factors (hash codes) is intractable, we devise an efficient alternating learning algorithm based on \mbox{MAP} estimation. Experimental results show that MLBE compares favorably with state-of-the-art multimodal hashing models. %For our future research, we will go beyond the point estimation approach presented in this paper to explore a more Bayesian treatment based on variational inference for enhanced robustness and efficiency. We would also like to extend \mbox{MLBE} to determine the code length $K$ automatically from data.  This is an important yet largely unaddressed issue in existing methods. Besides, we also plan to apply \mbox{MLBE} to other tasks such as multimodal medical image registration.
+
+\item[Co-regularized Hashing] For the general multimodal data, we propose a new method based on two popular supervised learning techniques: boosting and co-regularization, and name it co-regularized hashing (CRH). We no longer assume that the data are aligned or organized in graphs in CRH. To learn each bit of the hash codes, the objective function is in the form of a difference of convex functions, and we develop an efficient learning algorithm based on the convex-concave procedure (\mbox{CCCP}) and a stochastic gradient method. Hash functions for different bits are learned using a standard boosting method. Comparative studies based on benchmark data sets show that \mbox{CRH} outperforms two state-of-the-art multimodal hashing methods.
+\end{description}
+%\begin{itemize}
+%%\item[Active Hashing] We first present the active hashing framework, which provides a general approach to select labeled data from which existing semi-supervised hash function learning methods can learn. 
+%
+%\item We first study a simple case in which multimodal data are aligned, and propose one method based on spectral analysis.
+%
+%\item Then for graph data, which is more general than aligned data, we give a probabilistic model based on latent feature models.
+%
+%\item Finally, we move to the general case and present co-regularized hashing, which takes advantage of boosting and optimization in learning multimodal hash functions. Complete comparative experiments validate the effectiveness of our models.
+%\end{itemize}
+
+%Multimodal hashing is more general and challenging than most existing hashing methods which are for uni-modal data.
+
+%-------------------------------------------------------------------------------
+\section{Future Work}
+
+%Though we have tried to solved some basic problems of active hashing and multimodal hashing, there are still several open questions needing to be answered. 
+
+To take our work further, we wish to study the following topics in the near future:
+
+\begin{description}
+\item[Challenging issues in Multimodal Hashing] In multimodal hash function learning, there are several challenging issues worth further studying. Among other things, it is the most important to learn an appropriate length of hash codes automatically from data. It is well known that the hash codes generated by HFL methods are always much shorter than those generated by LSH methods, however, there is no benchmark result on learning the code length. %Moreover, we would like to study some other applications of multimodal hash function learning, including medical image alignment and image or video de-duplication.
+
+\item[Hierarchical Hash Function Learning] Most existing \mbox{HFL} methods assume that different hash bits are equally important, in other words, there is no structure in the hash codes. This assumption can be easily violated in applications where similarity search should be performed in different resolutions or levels. Although several researchers have made some preliminary attempts on generating multiple bits based on one hash function~\cite{liu2011icml}, to the best of our knowledge, no result has been reported on hash functions with structures.
+
+We propose to develop hierarchical \mbox{HFL} methods. In addition to supporting different levels of search, the structural information of hash codes can be used to reduce the search space and hence further improve the scalability. For example, one can use coarse-level hash codes to find a candidate space and then fine-level hash codes for nearest neighbors. Moreover, hierarchical \mbox{HFL} can be used to combine different hashing models. For example, given that some hash functions are sensitive to recall while others are sensitive to precision, we can organize different kinds of hash codes in such a hierarchy that the new model can take advantages of different models.
+
+\item[Sublinear Hash Function Learning]
+Many \mbox{HFL} algorithms rely on expensive matrix operations such as eigen-decompostion and inversion. Obviously, they are not suitable for very high-dimensional data, such as text and image, unless the data are properly preprocessed. Although recent progress shows that linear time complexity can be expected~\cite{lin2010cvpr}, complicated approximation techniques are required in these methods. Furthermore, even linear time algorithms are sometimes not feasible in real large-scale applications. 
+
+Recently, a family of sublinear algorithms has emerged in the machine learning area~\cite{hazan2011nips}. These algorithms have been applied to learning support vector machines (\mbox{SVM}) for classification problems. We believe that it is also possible to develop sublinear \mbox{HFL} algorithm, because some \mbox{HFL} algorithms such as CRH are similar to \mbox{SVM} training algorithms in some sense.
+
+\item[Collaborative Filtering and Hash Function Learning]
+Almost all \mbox{HFL} methods focus on similarity search applications. Nevertheless, other large-scale data mining tasks can also benefit from \mbox{HFL}. One outstanding example is collaborative filtering (\mbox{CF}), which is a very important technique for data mining and, more specifically, the recommender systems. So far as we know, several non-learning based hashing methods have been used to improve collaborative filtering~\cite{shi2009aistats,weinberger2009icml}, and we believe that \mbox{HFL} can make further improvement.
+
+One possible approach may be to formulate \mbox{CF} as a multimodal hashing problem. To recommend movies to users, we just find nearest neighbor movies of the users in a common Hamming space. The learning problem needs to take into consideration the collaborative rating matrix as well as other side information, and the whole learning procedure should be conducted in sublinear time.
+
+%\item[Applications of Hash Function Learning] 
+%To further explore the topic of hash function learning, in the near future, we would like to explore the idea of learning hash functions for problems other than similarity search, such as classification, regression, ranking and collaborative filtering. 
+
+\end{description}
+
+
+%\subsection{Active Hashing}
+%For active hashing, we plan to explore other criteria of data informativeness. For example, we may select the points which maximize information gain or minimize the expected error on test data. Moreover, although we have demonstrated that it is more effective to select and label points rather than pairwise constraints, it would be interesting to explore the informativeness of pairwise constraints directly for some supervised \mbox{HFL} methods. Last but not least, another possible research direction is to explore other batch mode algorithms for active hashing.
+
+
+
+
+
+
+%\subsubsection{Unified Framework for Hash Function Learning }
+%
+%%\paragraph{What makes good codes?}
+%%Yes, it depends on applications. But we should be clear when and why and how.
+%There are different categorizations of \mbox{HFL} methods, such as supervised/unsupervised algorithms. However, little research effort has been put on summarize the assumptions in the unifying framework.
+%
+%We would like to propose a general framework, such as most current methods can be put into proper positions.
+
+
+
+

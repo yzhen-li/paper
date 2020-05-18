@@ -1,0 +1,107 @@
+
+\chapter{Introduction}
+
+Similarity search, \aka proximity search or nearest neighbor search, plays a fundamental role in many data mining or pattern recognition problems, e.g., document retrieval, text categorization, near-duplicate detection and collaborative filtering~\cite{yianilos1993soda,shakhnarovich2006book}. Briefly speaking, similarity search aims to find the nearest neighbors, measured by some similarity measures, of a given query document.\footnote{The term `document' is used here in a broad sense to refer to data represented in any form, including text, image, video or their combinations.} Obviously, computing the similarity exhaustively between the query and every candidate document does not work for large data sets due to the prohibitive computation and storage costs.
+
+To address the scalability issue, a number of \textit{approximate} search techniques for similarity search have been proposed~\cite{arya1998jacm,Friedman1977atms,andoni2006focs,shakhnarovich2005thesis}. These methods can achieve sublinear search time at the cost of sacrificing accuracy in an acceptable sense. There are generally two approaches, namely, tree-based methods~\cite{arya1998jacm,Friedman1977atms,weber1998vldb} and hashing-based methods~\cite{andoni2006focs,shakhnarovich2005thesis}. Although tree-based methods work well on low-dimensional data, they often give no speedup on even slightly higher-dimensional data and also have very high storage demand. These two limitations make tree-based methods unappealing for applications in which high dimensionality is commonly encountered. On the contrary, hashing-based methods can perform very fast search and use substantially reduced storage by indexing data with compact binary codes. As such, considerable research effort has been spent on hashing-based approaches over the past several years. For example, lots of hash functions have been proposed for many similarity measures and successfully applied to many tasks. Most of these methods are based on random projections or permutations, and can achieve accuracy comparable with exact search asymptotically. However, they often generate very long codes mainly due to their data independence nature. %\footnote{Here you should differentiate LSH and HFL. LSH usually generate long codes.}
+
+Recently, some researchers~\cite{salakhutdinov2009ijar,weiss2008nips,kulis2009nips,wang2010icml,mu2010cvpr} have made various attempts to use machine learning techniques to learn hash functions from data.  The working hypothesis underlying these methods is that data-dependent hash functions learned from data can reflect the data characteristics more accurately than data-independent hash functions such as those in previous works based on random projections or permutations. In this thesis, we regard learning hash functions from data as a new research topic and call it \textit{hash function learning} (\mbox{HFL}). Since hashing-based methods have been applied in a vast range of areas, \mbox{HFL} may have great potential impact, both on the theory side and the application side, in the near future. Our focus in this work will be \mbox{HFL}.
+
+According to whether or not machine learning techniques are used, we divide existing hashing-based methods into two classes: locality sensitive hashing (\mbox{LSH}) and hash function learning. As stated earlier, hash functions of \mbox{LSH} are always based on random projections or permutations, but those of \mbox{HFL} are learned from data. There are several perspectives from which to look into existing \mbox{HFL} approaches. Depending on how labeled data or side information (\aka supervision) is used in the learning procedure, we can classify \mbox{HFL} methods into three categories: unsupervised methods, semi-supervised methods and supervised methods. In unsupervised \mbox{HFL}, only unlabeled data are used, while in supervised \mbox{HFL}, only labeled data are used. In semi-supervised \mbox{HFL}, both unlabeled and labeled data are used together to learn the hash functions. According to whether or not the learner can choose the data from which it learns, \mbox{HFL} methods can be classified as passive hashing methods or active hashing methods. Passive hashing learns hash functions from data provided in advance, but active hashing chooses the data from which to learn. According to the characteristics of the data being processed, \mbox{HFL} methods can be grouped into unimodal methods or multimodal methods. While unimodal hashing deals with data of only one modality, multimodal hashing can process data of multiple modalities. To make it clearer, we summarize the categorization of hashing-based approaches in Figure~\ref{fig:intro:HashingCat}.
+
+\begin{figure}[htb]
+\centering
+\vspace{-0.5cm}
+\epsfig{figure=fig/HashingCat.pdf, width=1\textwidth}
+\vspace{-3cm}
+\caption{The categorization of hashing-based methods for similarity search. The orange ovals indicate the categorization criteria and the blue rectangles indicate the category names.}\label{fig:intro:HashingCat}
+\end{figure}
+
+
+Though \mbox{HFL} methods have obtained great successes in many applications recently, research on this topic is still young and far from complete. In this thesis, we focus on two research issues, that is, \textit{active hashing} and \textit{multimodal hashing}, which have not been well studied to date. In the following content, we first give the motivations of these two research topics and then summarize the main contributions. After that, we outline the organization of the whole thesis and conclude this chapter with a summary of notations which are used throughout the thesis. 
+
+
+% % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
+\section{Motivations}
+
+
+\subsection{Motivation of Active Hashing} 
+Existing supervised or semi-supervised \mbox{HFL} methods can be regarded as \textit{passive hashing}, since they assume that side-information or data labels are provided before learning. Given that the data labeling procedure can be very time costly and the quality of labeled data can be very diverse, it is better to actively choose data to label before learning from them. To this end, we propose a novel framework, called \textit{active hashing}, to actively select the most informative unlabeled data to label for hash function learning.
+
+\subsection{Motivation of Multimodal Hashing}
+As mentioned earlier, \mbox{HFL} methods can be classified into unimodal methods or multimodal methods, depending on the characteristics of the data. Most previous research effort has been spent on unimodal \mbox{HFL} approaches, in which data points are assumed to be of a single modality. This assumption is obviously not true in many applications such as multimedia retrieval, where data are often generated from multiple modalities, for example, text, image, audio, video, and so on. To perform hashing on such multimodal data, we propose three models under the framework of \textit{multimodal hashing} with the goal of hashing data points of different modalities into a single Hamming space, and hence multimodal similarity search can be easily performed.
+
+% % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
+\section{Contributions}
+
+Our major contributions are:
+\begin{itemize}
+\item For active hashing, we propose a novel framework to make existing \mbox{HFL} methods cost effective. A simple method based on data uncertainty is developed. Experimental results show that our method outperforms previous passive hashing methods by a large margin.
+
+\item For multimodal hashing, three models are proposed. For aligned data, in which different modalities are aligned, we present spectral multimodal hashing. For graph data, in which pairwise similarity values are available, we present a multimodal latent binary embedding model which comes under the umbrella of latent feature models. To handle general data, we develop a model called co-regularized hashing based on boosted co-regularization. Extensive experiments demonstrate that these methods compare favorably with the baselines.
+\end{itemize}
+
+%we develop two methods. One method directly optimizes the reconstructive distance from the original space to the Hamming space, which is a natural extension of one state-of-the-art unimodal \mbox{HFL} method. The other method treats the hash codes as latent variables and fits a latent factor model to the observations and latent variables.
+
+% % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
+\section{Thesis Organization}
+
+The rest of this thesis is organized as follows:
+
+Chapter~\ref{chap:background} introduces some background knowledge, including a brief literature review of hashing-based methods for similarity search. Additionally, two related machine learning areas, namely, metric learning and active learning, are reviewed and their relationships with hash function learning are discussed.
+
+Chapter~\ref{chap:ah} presents the active hashing framework and a batch mode active hashing algorithm.
+
+Chapter~\ref{chap:smh} presents one multimodal hashing method for aligned data, called spectral multimodal hashing.
+
+Chapter~\ref{chap:mlbe} presents a multimodal hashing model for graph data, termed multimodal latent binary embedding.
+% including the details of a non-probabilistic model based on spectral analysis and a probabilistic model based on latent feature models. The experimental performance of these two methods on multimedia retrieval are also provided with discussion.
+
+Chapter~\ref{chap:crh} presents the multimodal hashing methods for general data, called co-regularized hashing. %The model is based on boosted co-regularization. Extensive experiments on crossmodal retrieval are reported in detail.
+
+Chapter \ref{chap:conclusion} concludes the whole thesis and proposes several research issues for future pursuit.
+
+% % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
+\section{Notations}
+Some common notations used in the thesis are summarized in Table~\ref{table:notation}.
+
+\begin{table}[ht]
+\caption{Table of Notations}
+\vspace{0.5cm}
+\centering
+\begin{tabular}{c|c}
+\toprule[1pt]\addlinespace[0pt]
+Notation & Physical Meaning\\
+\addlinespace[0pt]\midrule[1pt]\addlinespace[0pt]
+$\a\in\mathbb{R}^{d}$ & a $ d $-dimensional (column) vector denoted by a boldface lowercase letter\\
+\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+$a(i)$ & the $i$th element of a vector $\a$\\
+\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+$\1$ & a vector of all 1's with appropriate size\\
+\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+$\0$ & a vector of all 0's with appropriate size\\
+\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+$\A\in\mathbb{R}^{m\times n}$ & a matrix of size $ m \times n $ denoted by a boldface uppercase letter\\
+\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+$A(i,j)$ & the $(i,j)$th element of a matrix $\A$\\
+\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+$A_{ij}$ & the $(i,j)$th element of a matrix $\A$\\
+\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+$\I$ & an identity matrix with appropriate size\\
+\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+$\mathcal{A}$ & a set denoted by a calligraphic uppercase letter\\
+\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+$\tr(\A)$ & trace of a matrix $\A$\\
+\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+$\A^{T}$ & transpose of a matrix $\A$\\
+\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+$|\mathcal{A}|$ & size of a set $\mathcal{A}$\\
+\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+$\sgn(a)$ & the sign of a real number $a$\\
+\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+$\|\x - \y\|_{H}$ & Hamming distance between $\x$ and $ \y $\\
+ \addlinespace[0pt]\bottomrule[1pt]
+\end{tabular}
+\label{table:notation}
+\end{table}
+

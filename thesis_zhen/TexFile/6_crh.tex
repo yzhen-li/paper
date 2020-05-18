@@ -1,0 +1,749 @@
+
+\chapter{Multimodal Hashing for General Data}
+\label{chap:crh}
+
+%-------------------------------------------------------------------------------
+\section{Introduction}
+
+As stated earlier, the \mbox{SMH} model and the \mbox{MLBE} model require the data points in different modalities to be aligned or organized in graphs. However, these assumptions might not be the case in some applications. 
+
+In this chapter, we present a novel model for data in general form. Specifically, we develop Co-Regularized Hashing (\mbox{CRH}), which is based on a boosted co-regularization framework. For each bit of the hash codes, \mbox{CRH} learns a group of hash functions, one for each modality, by minimizing a novel loss function. Although the loss function is non-convex, it is in a special form which can be expressed as a difference of convex functions.  As a consequence, the Concave-Convex Procedure~(CCCP)~\cite{yuille2001nips}
+can be applied to solve the optimization problem iteratively.  We use a stochastic gradient method in each \mbox{CCCP} iteration. After learning the hash functions for one bit, \mbox{CRH} proceeds to learn more bits via a boosting procedure such that the bias introduced by the hash functions can be sequentially minimized.
+
+In the following, we present the \mbox{CRH} model in Section~\ref{crh:model}. Empirical study conducted on three real data sets is reported in Section~\ref{crh:exps} before the conclusion in Section~\ref{crh:conclusion}.
+
+%-------------------------------------------------------------------------------
+\section{Co-Regularized Hashing}
+\label{crh:model}
+
+%We use boldface lowercase letters and calligraphic letters to denote vectors and sets, respectively. For a vector $\x $, $\x^{T} $ denotes its transpose and $\|\x\| $ its $\ell_2$ norm. 
+
+
+%*******************************************************************************
+\subsection{Objective Function}
+
+Suppose that there are two sets of data points from two modalities,\footnote{For simplicity of our presentation, we focus on the bimodal case here and leave the discussion on extension to more than two modalities to Section~\ref{sec:moel:ext}.}
+e.g., $\{\x_{i}\in\mathcal{X}\}_{i=1}^{I}$ for a set of $I$ images from some feature space $\mathcal{X}$ and $\{\y_{j}\in\mathcal{Y}\}_{j=1}^{J}$ for a set of $J$ textual documents from another feature space $\mathcal{Y}$. We also have a set of $N$ inter-modality point pairs $\Theta = \{(\x_{a_1},\y_{b_1}), (\x_{a_2},\y_{b_2}),\dots, (\x_{a_N},\y_{b_N})\}$, where, for the $n$th pair, ${a_n}$ and $b_{n}$ are indices of the points in $\mathcal{X}$ and $\mathcal{Y}$, respectively. We further assume that each pair has a label $s_{n} = 1$ if $\x_{a_n}$ and $\y_{b_n}$ are similar and $s_{n}=0$ otherwise.  The notion of inter-modality similarity varies from application to application.  For example, if an image includes a tiger and a textual document is a research paper on tigers, they should be labeled as similar.  On the other hand, it is highly unlikely to label the image as similar to a textual document on basketball.
+%\footnote{*** In general, you should write it as $\Theta = \{(\x_{a_1},\y_{b_1}), (\x_{a_2},\y_{b_2}),\dots, (\x_{a_N},\y_{b_N})\}$.}
+
+For each bit of the hash codes, we define two linear hash functions as follows:
+\begin{align}
+f(\x ) = \sgn(\w_{x}^{T}\x) \ \ \mbox{and} \ \ g(\y ) &= \sgn(\w_{y}^{T}\y),\nonumber
+\end{align}
+where $\sgn(\cdot)$ denotes the sign function, and $\w_{x}$ and $\w_{y}$ are projection vectors which, ideally, should map similar points to the same hash bin and dissimilar points to different bins.  Our goal is to achieve \mbox{HFL} by learning $\w_{x}$ and $\w_{y}$ from the multimodal data.
+
+To achieve this goal, we propose to minimize the following objective function \wrt~(with respect to) $\w_{x}$ and $\w_{y}$:
+\begin{align}
+\mathcal{O}= \frac{1}{I}\sum\limits_{i=1}^{I}\ell_{i}^{x}+\frac{1}{J}\sum\limits_{j=1}^{J}\ell_{j}^{y}+\gamma\sum_{n=1}^{N}\omega_{n}\ell_{n}^{*}+\frac{\lambda_{x}}{2}\|\w_{x}\|^{2}+\frac{\lambda_{y}}{2}\|\w_{y}\|^{2},
+\label{eqn:loss}
+\end{align}
+where $\ell_{i}^{x}$ and $\ell_{j}^{y}$ are intra-modality loss terms for modalities $\mathcal{X}$ and $\mathcal{Y}$, respectively. In this work, we define them as:
+\begin{align}
+\ell_{i}^{x}&=\big[1-f(\x_i)(\w_{x}^{T}\x_i)\big]_{+}=\big[1-|\w_{x}^{T}\x_{i}|\big]_{+},\nonumber\\
+\ell_{j}^{y}&=\big[1-g(\y_j)(\w_{y}^{T}\y_j)\big]_{+}=\big[1-|\w_{y}^{T}\y_{j}|\big]_{+},\nonumber
+\end{align}
+where $[a]_{+}$ is equal to $a$ if $a \ge 0$ and 0 otherwise.  We note that the intra-modality loss terms are similar to the hinge loss in the (linear) support vector machine but have quite different meaning. Conceptually, we want the projected values to be far away from 0 and hence expect the hash functions learned to have good generalization ability~\cite{mu2010cvpr}.
+For the inter-modality loss term $\ell_{n}^{*}$, we associate with each point pair a weight $\omega_{n}$, with $\sum\nolimits_{n=1}^{N}\omega_n=1$, to normalize the loss as well as compute the bias of the hash functions. In this paper, we define $\ell_{n}^{*}$ as
+\begin{align}
+\ell_{n}^{*} = s_{n}d_{n}^{2}+(1-s_{n})\tau(d_{n}),\nonumber
+\end{align}
+where $d_{n} = \w_{x}^{T}\x_{a_n}-\w_{y}^{T}\y_{b_n}$ and $\tau(d)$ is called the smoothly clipped inverted squared deviation (\mbox{SCISD}) function. 
+
+
+%\footnote{*** But the nature of the problem is different.  You are not dealing with a classification problem here.  Implicitly you want the projected values to be far away from 0.  It is only in this sense that it is similar to the maximum margin criterion.}
+
+The \mbox{SCISD} function was first proposed in~\cite{quadrianto2011icml}.  It can be defined as follows:
+\begin{align}
+\tau(d) & =\left\{ \begin{array}{ll}
+         -\frac{1}{2}d^{2}+\frac{a\lambda^2}{2} & \mbox{if ~} |d| \le \lambda \\
+         \frac{d^{2}-2a\lambda|d|+a^2\lambda^2}{2(a-1)}& \mbox{if ~}\lambda < |d|\le a\lambda\\
+         0 & \mbox{if ~} a\lambda<|d|,\nonumber
+                          \end{array} \right.
+\end{align}
+where $a$ and $\lambda$ are two user-specified parameters.  The \mbox{SCISD} function penalizes projection vectors that result in small distance between dissimilar points after projection.  A more important property is that it can be expressed as a difference of two convex functions.  Specifically, we can express $\tau(d) = \tau_{1}(d) - \tau_{2}(d)$ where
+\begin{align}
+\tau_{1}(d) = \left\{ \begin{array}{ll}
+         0 & \mbox{if ~}|d| \le \lambda \\
+         \frac{ad^{2}-2a\lambda|d|+a\lambda^2}{2(a-1)}& \mbox{if ~}\lambda < |d|\le a\lambda\\
+         \frac{1}{2}d^{2}-\frac{a\lambda^2}{2} & \mbox{if ~} a\lambda<|d|\nonumber
+                          \end{array} \right.\ \mbox{and}  \ \ 
+\tau_{2}(d) = \frac{1}{2}d^{2}-\frac{a\lambda^2}{2}.\nonumber
+\end{align}
+%Obviously, both $\tau_{1}(\cdot)$ and $\tau_{2}(\cdot)$ are convex functions. 
+
+%*******************************************************************************
+%\subsection{Relaxation via \mbox{CCCP}}
+%
+%It is easy to realize that all the terms in the objective function~(\ref{eqn:loss}) are convex except $\tau(\cdot)$, which, as explained above, can be expressed as a difference of two convex functions. As a consequence, we can use \mbox{CCCP} to solve the non-convex optimization problem iteratively with each iteration minimizing a convex upper bound of the original objective function.
+%
+%%
+%%The only non-convex term in the objective function is $\tau(d_{n})$, but it can be easily decomposed to the difference of two convex functions~\cite{quadrianto2011icml}. 
+%%
+%%Because both $\tau_{1}(d_{n})$ and $\tau_{2}(d_{n})$ are convex functions \wrt (with respect to) $\w_{x}$ or $\w_{y}$, and we can use a general \mbox{CCCP} approach to get two convex upper bounds, respectively.
+%
+%Briefly speaking, given an objective function $f_{0}(x)-g_{0}(x)$ where both $f_{0}$ and $g_{0}$ are convex, \mbox{CCCP} works iteratively as follows.  The variable $x$ is first randomly initialized to $x_0$.  At the $t$th iteration, \mbox{CCCP} minimizes the following convex upper bound of $f_{0}(x)-g_{0}(x)$ at location $x_{t}$:
+%$$f_{0}(x)-\big(g_{0}(x_{t})+\partial_{x}g_{0}(x_{t})(x-x_{t})\big),$$
+%where $\partial_{x}g_{0}(x_{t})$ is the first derivative of $g(x)$ at $x_{t}$. This optimization problem can be solved using any convex optimization solver to obtain $x_{t+1}$.  Given an initial value $x_{0}$, the solution sequence $\{x_{t}\}$ found by \mbox{CCCP} is guaranteed to reach a local minimum or a saddle point. 
+%
+%For our problem, at the $t$th \mbox{CCCP} iteration, the convex upper bound of $\tau(d_{n})$ \wrt~$\w_{x}$ is:
+%\begin{align}
+%%\label{eqn:upperx}
+%\hat{\tau}_{x}(d_{n}) &= \tau_{1}(d_{n})-\frac{({d}^{(t)}_{n})^{2}}{2}+\frac{a\lambda^2}{2}-{d}^{(t)}_{n}\x_{a_n}^{T}(\w_{x}-\w_{x}^{(t)})\nonumber,
+%\end{align}
+%where $\w_{x}^{(t)}$ is the value of $\w_{x}$ at the $t$th iteration and ${d}^{(t)}_{n} = (\w^{(t)}_{x})^{T}\x_{a_n}-\w_{y}^{T}\y_{b_n}$.
+%
+%
+%Similarly, the convex upper bound of $\tau(d_{n})$ \wrt~$\w_{y}$ at the $t$th iteration is:
+%\begin{align}
+%%\label{eqn:uppery}
+%\hat{\tau}_{y}(d_{n}) &= \tau_{1}(d_{n})-\frac{({d}^{(t)}_{n})^{2}}{2}+\frac{a\lambda^2}{2}+{d}^{(t)}_{n}\y_{b_n}^{T}(\w_{y}-\w_{y}^{(t)}),\nonumber
+%\end{align}
+%where $\w_{y}^{(t)}$ is the value of $\w_{y}$ at the $t$th iteration and ${d}^{(t)}_{n} = \w_{x}^{T}\x_{a_n}-(\w^{(t)}_{y})^{T}\y_{b_n}$.
+%%The convex upper bound \wrt $\w_{y}$ is:
+%%\begin{align}
+%%\hat{\tau}(n) &= \tau_{1}(n)-\frac{1}{2}(\hat{d}^{(t)}_{n})^{2}+\frac{a\lambda^2}{2}+d^{(t)}_{n}\y_{b_n}^{T}(\w_{2}-\w_{2}^{t})\nonumber,
+%%\end{align}
+%%where $\hat{d}^{(t)}_{n} = \w_{1}^{T}\x_{a_n}-(\w^{(t)}_{2})^{T}\y_{b_n}$.
+
+
+%*******************************************************************************
+\subsection{Optimization}
+
+Though the objective function (\ref{eqn:loss}) is nonconvex \wrt $\w_{x}$ and $\w_{y}$, we can optimize it \wrt~$\w_{x}$ and $\w_{y}$ in an alternating manner. Take $\w_{x}$ for example, we remove the irrelevant terms and get the following objective:
+\begin{align}
+\frac{1}{I}\sum\limits_{i=1}^{I}\ell_{i}^ {x}+\frac{\lambda_{x}}{2}\|\w_{x}\|^{2}+\gamma\sum\limits_{n=1}^{N}\omega_{n}\ell_{n}^{*},
+\label{obj:x}
+\end{align}
+where
+\begin{align}
+\ell_{i}^{x}=\left\{ \begin{array}{ll}
+         0 & \mbox{if ~}|\w_{x}^{T}\x_{i}| \ge 1 \\
+         1- \w_{x}^{T}\x_{i} & \mbox{if ~}0\le\w_{x}^{T}\x_{i} < 1 \\
+         1+\w_{x}^{T}\x_{i} & \mbox{if ~} -1 <\w_{x}^{T}\x_{i}<0\nonumber
+                          \end{array} \right..
+%
+\end{align}
+
+It is easy to realize that the objective function~(\ref{obj:x}) can be expressed as a difference of two convex functions in different cases. As a consequence, we can use \mbox{CCCP} to solve the non-convex optimization problem iteratively with each iteration minimizing a convex upper bound of the original objective function.
+
+Briefly speaking, given an objective function $f_{0}(x)-g_{0}(x)$ where both $f_{0}$ and $g_{0}$ are convex, \mbox{CCCP} works iteratively as follows.  The variable $x$ is first randomly initialized to $x^{(0)}$.  At the $t$th iteration, \mbox{CCCP} minimizes the following convex upper bound of $f_{0}(x)-g_{0}(x)$ at location $x^{(t)}$:
+$$f_{0}(x)-\big(g_{0}(x^{(t)})+\partial_{x}g_{0}(x^{(t)})(x-x^{(t)})\big),$$
+where $\partial_{x}g_{0}(x^{(t)})$ is the first derivative of $g(x)$ at $x^{(t)}$. This optimization problem can be solved using any convex optimization solver to obtain $x^{(t+1)}$.  Given an initial value $x^{(0)}$, the solution sequence $\{x^{(t)}\}$ found by \mbox{CCCP} is guaranteed to reach a local minimum or a saddle point.
+
+For our problem, the optimization problem at the $t$th iteration is minimizing the following upper bound of Equation~(\ref{obj:x}) \wrt $\w_x$:
+\begin{align}
+\mathcal{O}_{x}=\frac{\lambda_{x}\|\w_{x}\|^{2}}{2}+\gamma\sum\limits_{n=1}^{N}\omega_{n}\left(s_{n}d_{n}^{2}+(1-s_{n})\zeta^{x}_{n}\right) + \frac{1}{I}\sum\limits_{i=1}^{I}\ell_{i}^{x},
+\label{eqn:objx}
+\end{align}
+where $\zeta^{x}_{n} = \tau_{1}(d_{n})-\tau_{2}(d_{n}^{(t)})-{d}^{(t)}_{n}\x_{a_n}^{T}(\w_{x}-\w_{x}^{(t)}),{d}^{(t)}_{n} = (\w^{(t)}_{x})^{T}\x_{a_n}-\w_{y}^{T}\y_{b_n},$
+%\begin{align}
+%\iota_{i}^{x}=& \left\{ \begin{array}{ll}
+%      0 & \mbox{if ~}|\w_{x}^{T}\x_{i}| \ge 1 \\
+%      1-\left(|(\w^{(t)}_{x})^{T}\x_{i}|+\sgn\left((\w^{(t)}_{x})^{T}\x_{i}\right)\x_{i}^{T}(\w_{x}-\w_{x}^{(t)})\right)& \mbox{if ~} |\w_{x}^{T}\x_{i}|<1\nonumber
+%                       \end{array} \right.,
+%\end{align}
+and $\w_{x}^{(t)}$ is the value of $\w_{x}$ at the $t$th iteration.
+
+%Note that we use subgradient of the absolute function since it is non-differentiable at some locations.
+%where $\zeta^{x}_{n} = \tau_{1}(d_{n})-\tau_{2}(d_{n}^{(t)})-{d}^{(t)}_{n}\x_{a_n}^{T}(\w_{x}-\w_{x}^{(t)})$, $\iota_{i}^{x}=|(\w^{(t)}_{x})^{T}\x_{i}|+\sgn((\w^{(t)}_{x})^{T}\x_{i})\x_{i}^{T}(\w_{x}-\w_{x}^{(t)})$, $\w_{x}^{(t)}$ is the value of $\w_{x}$ at the $t$th iteration and ${d}^{(t)}_{n} = (\w^{(t)}_{x})^{T}\x_{a_n}-\w_{y}^{T}\y_{b_n}$.
+
+%For each vector $\w_{x}$ or $\w_{y}$, the corresponding convex upper bound at the current location is minimized.
+%\footnote{*** What do you mean by a new objective?  The objective function remains unchanged.  You are just taking a coordinate descent approach by optimizing the SAME objective function but with respect to DIFFERENT optimization variables. Answer: The convex upper bound \wrt different optimization variables are different, because the DC part is replaced by Taylor expansions at different locations.}
+To find a local optimal solution of problem~(\ref{eqn:objx}), we can use any gradient based methods. In this work, we develop a stochastic gradient solver based on Pegasos~\cite{shalev2007icml}, which is known to be one of the fastest solvers for margin-based classifiers. Specifically, we randomly select $k$ point from each modality and $l$ point pairs to evaluate the gradient at each iteration. %Note that since the subproblem in each \mbox{CCCP} iteration is convex, in fact any off-the-shelf solver could be used.  We use the aforementioned solver due mainly to its efficiency. 
+%\footnote{*** The logic of this paragraph is confusing.  First, the objective function is always the same.  Alternating between $\w_x$ and $\w_y$ is just the nature of the coordinate descent procedure.  Second, since the optimization problem in each CCCP iteration is convex, in principle any off-the-shelf solver can give the optimal solution.  However, the stochastic subgradient solver is used here for the efficiency concern.}
+
+% each \mbox{CCCP} iteration, the objective involved is convex and any . In this paper, we  proposed by. 
+
+%with respect to their convex upper bound, respectively.
+
+%At the $t$th iteration, the optimization problem \wrt~$\w_{x}$ uses the following objective function which includes only those terms in $\mathcal{O}$ that depend on $\w_{x}$:
+%\begin{align}
+%\mathcal{O}_{x}
+%=& \frac{1}{I}\sum\limits_{i=1}^{I}\big[1-|\w_{x}^{T}\x|\big]_{+}+\frac{\lambda_{x}}{2}\|\w_{x}\|^{2}\nonumber\\
+%&+\gamma\sum_{n=1}^{N}\omega_{n}\left(s_{n}d_{n}^{2}+(1-s_{n})\hat{\tau}_{x}(d_{n})\right).
+%\label{eqn:objx}
+%\end{align}
+
+The key step of our method is to evaluate the gradient of objective function~(\ref{eqn:objx}) \wrt~$\w_{x}$, which can be computed as
+\begin{align}
+\frac{\partial \mathcal{O}_{x}}{\partial \w_{x} }=2\gamma\sum\limits_{n=1}^{N}\omega_{n}s_{n}d_{n}\x_{a_n}+\gamma\sum\limits_{n=1}^{N}\omega_{n}\muu_{n}^{x}+\lambda_{x}\w_{x}- \frac{1}{I}\sum\limits_{i=1}^{I}\pii^{x}_{i},
+\end{align}
+%\begin{align}
+%\frac{\partial \mathcal{O}_{x}}{\partial \w_{x} }=\left\{ \begin{array}{ll}
+%      2\gamma\sum\limits_{n=1}^{N}\omega_{n}s_{n}d_{n}\x_{a_n}+\gamma\sum\limits_{n=1}^{N}\omega_{n}\muu_{n}^{x}+\lambda_{x}\w_{x} & \mbox{if ~}|\w_{x}^{T}\x| \ge 1 \\
+%      2\gamma\sum\limits_{n=1}^{N}\omega_{n}s_{n}d_{n}\x_{a_n}+\gamma\sum\limits_{n=1}^{N}\omega_{n}\muu_{n}^{x}+\lambda_{x}\w_{x}- \frac{1}{I}\sum\limits_{i=1}^{I}\left(\sgn((\w^{(t)}_{x})^{T}\x_{i})\x_{i}\right)& \mbox{if ~} |\w_{x}^{T}\x|<1\nonumber
+%                       \end{array} \right.
+%\end{align}
+where $\muu_{n}^{x}=(1-s_{n}) \left(\frac{\partial \tau_1}{\partial d_{n}}-{d}^{(t)}_{n}\right)\x_{a_n} $,
+\begin{align}
+\frac{\partial \tau_1}{\partial d_{n}} & =\left\{ \begin{array}{ll}
+         0 & \mbox{if ~} |d_{n}| \le \lambda \\
+         \frac{ad_{n}-2a\lambda\sgn(d_{n})}{(a-1)}& \mbox{if ~}\lambda < |d_{n}|\le a\lambda\\
+         d_{n} & \mbox{if ~}a\lambda<|d_{n}|.\nonumber
+                          \end{array} \right.\ \mbox{and} \ 
+                          \pii^{x}_{i}=\left\{ \begin{array}{ll}
+                                0 & \mbox{if ~}|\w_{x}^{T}\x_{i}| \ge 1 \\
+                                \sgn\left(\w^{T}_{x}\x_{i}\right)\x_{i}& \mbox{if ~} |\w_{x}^{T}\x_{i}|<1\nonumber
+                                                 \end{array} \right..
+\end{align}
+
+%To update $\w_{x}$, we use \mbox{CCCP} coupled with stochastic gradient descent (\mbox{SGD})~\cite{bottou2007nips}. Specifically, at one \mbox{CCCP} iteration, the objective function for $\w_{x}$ is:
+
+%Then we use stochastic gradient descent to find a local minimum, which is also a global minimum, of $\mathcal{L}_{x}$. We note that at some locations, the gradient of $f(x) = |x|$ may not exist, and we use subgradient $\nabla f(x) = \sgn(x)$ instead.
+
+Similarly, the objective function for the optimization problem \wrt~$\w_{y}$ at the $t$th \mbox{CCCP} iteration is:
+\begin{align}
+\mathcal{O}_{y}=\frac{\lambda_{y}\|\w_{y}\|^{2}}{2}+\gamma\sum\limits_{n=1}^{N}\omega_{n}\left(s_{n}d_{n}^{2}+(1-s_{n})\zeta^{y}_{n}\right) + \frac{1}{J}\sum\limits_{j=1}^{I}\ell_{j}^{y},
+\label{eqn:objy}
+\end{align}
+where $\zeta^{y}_{n} = \tau_{1}(d_{n})-\tau_{2}(d_{n}^{(t)})+{d}^{(t)}_{n}\y_{b_n}^{T}(\w_{y}-\w_{y}^{(t)}), {d}^{(t)}_{n} = \w_{x}^{T}\x_{a_n}-(\w^{(t)}_{y})^{T}\y_{b_n}$, $\w_{y}^{(t)}$ is the value of $\w_{y}$ at the $t$th iteration and 
+\begin{align}
+\ell_{j}^{y}=\left\{ \begin{array}{ll}
+         0 & \mbox{if ~}|\w_{y}^{T}\y_{j}| \ge 1 \\
+         1- \w_{y}^{T}\y_{j} & \mbox{if ~}0\le\w_{y}^{T}\y_{j} < 1 \\
+         1+\w_{y}^{T}\y_{j} & \mbox{if ~} -1 <\w_{y}^{T}\y_{j}<0\nonumber
+                          \end{array} \right..
+%
+\end{align}
+%\begin{align}
+%\iota_{j}^{y}=& \left\{ \begin{array}{ll}
+%      0 & \mbox{if ~}|\w_{y}^{T}\y_{j}| \ge 1 \\
+%      1-\left(|(\w^{(t)}_{y})^{T}\y_{j}|+\sgn\left((\w^{(t)}_{y})^{T}\y_{j}\right)\y_{j}^{T}(\w_{y}-\w_{y}^{(t)})\right)& \mbox{if ~} |\w_{y}^{T}\y_{j}|<1\nonumber
+%                       \end{array} \right.,
+%%\label{eqn:objx}
+%\end{align}
+
+
+%\begin{align}
+%\mathcal{O}_{y}=\left\{ \begin{array}{ll}
+%      \frac{\lambda_{y}\|\w_{y}\|^{2}}{2}+\gamma\sum\limits_{n=1}^{N}\omega_{n}\left(s_{n}d_{n}^{2}+(1-s_{n})\zeta^{y}_{n}\right) & \mbox{if ~}|\w_{y}^{T}\y| \ge 1 \\
+%      1+\frac{\lambda_{y}\|\w_{y}\|^{2}}{2}+\gamma\sum\limits_{n=1}^{N}\omega_{n}\left(s_{n}d_{n}^{2}+(1-s_{n})\zeta^{y}_{n}\right) - \frac{1}{J}\sum\limits_{j=1}^{J}\iota_{j}^{y}& \mbox{if ~} |\w_{y}^{T}\y|<1\nonumber
+%                       \end{array} \right.
+%%\label{eqn:objx}
+%\end{align}
+%where $\zeta^{y}_{n} = \tau_{1}(d_{n})-\tau_{2}(d_{n}^{(t)})+{d}^{(t)}_{n}\y_{b_n}^{T}(\w_{y}-\w_{y}^{(t)})$, $\iota_{j}^{y}=|(\w^{(t)}_{y})^{T}\y_{i}|+\sgn((\w^{(t)}_{y})^{T}\y_{i})\y_{i}^{T}(\w_{y}-\w_{y}^{(t)})$, $\w_{y}^{(t)}$ is the value of $\w_{y}$ at the $t$th iteration and ${d}^{(t)}_{n} = \w_{x}^{T}\x_{a_n}-(\w^{(t)}_{y})^{T}\y_{b_n}$.
+
+The corresponding gradient is given by
+\begin{align}
+\frac{\partial \mathcal{O}_{y}}{\partial \w_{y} }=-2\gamma\sum\limits_{n=1}^{N}\omega_{n}s_{n}d_{n}\y_{b_n}-\gamma\sum\limits_{n=1}^{N}\omega_{n}\muu_{n}^{y}+\lambda_{y}\w_{y}- \frac{1}{J}\sum\limits_{j=1}^{I}
+\pii^{y}_{j},
+\end{align}
+where $\muu_{n}^{y}=(1-s_{n}) \left(\frac{\partial \tau_1}{\partial d_{n}}-{d}^{(t)}_{n}\right)\y_{b_n}$ and
+\begin{align}
+\pii^{y}_{j}=\left\{ \begin{array}{ll}
+    0 & \mbox{if ~}|\w_{y}^{T}\y_{j}| \ge 1 \\
+    \sgn\left(\w_{y}^{T}\y_{j}\right)\y_{j}& \mbox{if ~} |\w_{y}^{T}\y_{j}|<1\nonumber
+                                     \end{array} \right..
+\end{align}
+
+%\begin{align}
+%\frac{\partial \mathcal{O}_{y}}{\partial \w_{y} }=\left\{ \begin{array}{ll}
+%      -2\gamma\sum\limits_{n=1}^{N}\omega_{n}s_{n}d_{n}\y_{b_n}-\gamma\sum\limits_{n=1}^{N}\omega_{n}\muu_{n}^{y}+\lambda_{y}\w_{y} & \mbox{if ~}|\w_{y}^{T}\y| \ge 1 \\
+%      -2\gamma\sum\limits_{n=1}^{N}\omega_{n}s_{n}d_{n}\y_{b_n}-\gamma\sum\limits_{n=1}^{N}\omega_{n}\muu_{n}^{y}+\lambda_{y}\w_{y}- \frac{1}{J}\sum\limits_{j=1}^{I}\left(\sgn((\w^{(t)}_{y})^{T}\y_{j})\y_{j}\right)& \mbox{if ~} |\w_{y}^{T}\y|<1\nonumber
+%                       \end{array} \right.
+%\end{align}
+%where $\muu_{n}^{y}=(1-s_{n}) \left(\frac{\partial \tau_1}{\partial d_{n}}-{d}^{(t)}_{n}\right)\y_{b_n} $.
+
+%The optimization for each bit is stochastic gradient descent, and we will use subgradient~\cite{boyd2004convex} for those hinge loss functions. We should list the gradient here.
+
+
+
+%*******************************************************************************
+\subsection{Algorithm}
+
+So far we have only discussed how to learn the hash functions for one bit of the hash codes.  To learn the hash functions for multiple bits, one could repeat the same procedure and treat the learning for each bit independently.  However, as reported in previous studies~\cite{wang2010cvpr,liu2011icml}, it is very important to take into consideration the relationships between different bits in \mbox{HFL}. In other words, to learn compact hash codes, we should coordinate the learning of hash functions for different bits.
+
+To this end, we take the standard \mbox{AdaBoost}~\cite{freund1997adaboost} approach to learn multiple bits sequentially.
+%\footnote{*** Has this same approach been used for \mbox{HFL} by others? ~\cite{bronstein2010cvpr} also used boosting to update $\omega_n$ for each pair, but their rule is different from ours.}
+Intuitively, this approach allows learning of the hash functions in later stages to be aware of the bias introduced by their antecedents.  The overall algorithm of \mbox{CRH} is summarized in Algorithm~\ref{alg:CRH}. %\footnote{*** You are abusing the symbols $w$ and $N$ (which have been used before), leading to confusion.}
+
+\begin{algorithm}[htb]
+   \caption{Co-Regularized Hashing}
+   \label{alg:CRH}
+\begin{algorithmic}
+%\begin{multicols}{2}
+   \STATE {\bfseries Input:} \\
+   $\mathcal{X},\mathcal{Y}$ -- multimodal data \\
+   $\Theta$ -- inter-modality point pairs\\
+   $K$ -- code length\\
+   $\lambda_{x},\lambda_{y},\gamma$ -- regularization parameters\\
+   $a,\lambda$ -- parameters for \mbox{SCISD} function
+   \STATE {\bfseries Output:} \\
+   $\w_{x}^{(k)}, k=1,\dots, K$ -- projection vectors for $\mathcal{X}$ \\
+      $\w_{y}^{(k)}, k=1,\dots, K$ -- projection vectors for $\mathcal{Y}$ 
+   \STATE
+	\STATE {\bfseries Procedure:}
+%   \STATE Initialize $noChange = true$.
+   \STATE Initialize $\omega_{n}^{(1)} = 1/N, \, \forall n \in \{1,2,\dots,N\}$.
+   \FOR{$k=1$ {\bfseries to} $K$}
+%   \IF{$x_i > x_{i+1}$}
+   \REPEAT
+   \STATE Optimize Equation~(\ref{eqn:objx}) to get $\w_{x}^{(k)}$;
+   \STATE Optimize Equation~(\ref{eqn:objy}) to get $\w_{y}^{(k)}$;
+   \UNTIL{convergence.}
+
+   \STATE Compute error of current hash functions:
+   \begin{align}
+   \epsilon_{k} = \sum\nolimits_{n=1}^{N}\omega^{(k)}_{n}\I_{[s_{n}\ne h_{n} ]},\nonumber
+   \end{align}
+   where $\I_{[a]} = 1$ if $a$ is true and $\I_{[a]} = 0$ otherwise, and
+   \begin{align}
+   h_{n} & = \left\{ \begin{array}{ll}
+            1 & f(\x_{a_n}) = g(\y_{b_n}) \\
+            0 & f(\x_{a_n}) \ne g(\y_{b_n})\nonumber
+                             \end{array} \right..
+   \end{align}
+   \STATE Set $\beta_{k} = \epsilon_{k}/(1-\epsilon_{k}).$
+   \STATE Update the weight for each point pair:
+   $$\omega^{(k+1)}_{n} =\omega^{(k)}_{n}\beta_{k}^{1-\I_{[s_{n}\ne h_{n}]}}.$$
+%   \ENDIF
+   \ENDFOR
+%\end{multicols}
+\end{algorithmic}
+\end{algorithm}
+
+The first computationally expensive part of the algorithm is to evaluate the gradients. The time complexity is $O((k+l)d)$, where $d$ is the data dimensionality, and $k$ and $l$ are the numbers of random points and random pairs, respectively, for the stochastic gradient solver. In our experiments, we set $k=1$ and $l=500$.  We notice that further increasing the two numbers brings no significant performance improvement. We leave the theoretical study of the impact of $k$ and $l$ to our future work. Another major computational cost comes from updating the weights of the inter-modality point pairs.  The time complexity is $O(dN)$, where $N$ is the number of inter-modality point pairs.
+
+To summarize, our algorithm scales linearly with the number of inter-modality point pairs and the data dimensionality. In practice, the number of inter-modality point pairs is usually small, making our algorithm very efficient.
+%\begin{figure}[htb] %\vspace{-0.3cm}
+%\begin{wrapfigure}{r}{0.6\textwidth}
+%\subfigure[Upating $\w_{x}$]{\label{fig:convergex}
+%    \begin{minipage}[b]{0.45\linewidth} %\vspace{-0.4cm}
+%%        \centering\vspace{-1cm}
+%        \epsfig{figure=fig/convergence_x, width=0.8\textwidth} %\vspace{-1.5cm}
+%    \end{minipage}}
+%\subfigure[Upating $\w_{y}$]{\label{fig:convergey}
+%    \begin{minipage}[b]{0.45\linewidth} %\vspace{-0.4cm}
+%%        \centering\vspace{-1cm}
+%        \epsfig{figure=fig/convergence_y, width=0.8\textwidth} %\vspace{-1.5cm}
+%    \end{minipage}}
+%%\vspace{-0.25cm}
+%\caption{Illustration of convergence behavior}\label{fig:converge}\end{wrapfigure}
+%%\vspace{-0.4cm}
+%\end{figure}
+
+%\begin{multicols}{2}
+%\begin{minipage}[b]{0.4\linewidth}
+%In Figure~\ref{fig:converge}, we empirically show the convergence behavior of our algorithm by plotting the objective function values and the corresponding upper bounds \wrt~the number of iterations. We can see that the bounds are very tight and our algorithm converges very fast and becomes stable after 20 iterations.
+%\end{minipage}
+%\begin{minipage}[b]{0.3\linewidth} %\vspace{-0.4cm}
+%        \centering %\vspace{-1cm}
+%        \epsfig{figure=fig/convergence_x, width=0.8\textwidth} %\vspace{-1.5cm}
+%        \caption{Upating $\w_{x}$}
+%    \end{minipage}
+%\begin{minipage}[b]{0.3\linewidth} %\vspace{-0.4cm}
+%        \centering %\vspace{-1cm}
+%        \epsfig{figure=fig/convergence_y, width=0.8\textwidth} %\vspace{-1.5cm}
+%        \caption{Upating $\w_{x}$}
+%    \end{minipage}
+%%\begin{minipage}{0.65\linewidth}
+
+
+
+%\end{minipage}
+%\end{multicols}
+%*******************************************************************************
+\subsection{Extensions}
+\label{sec:moel:ext}
+%\subsection{Kernelization}
+We briefly discuss two possible extensions of \mbox{CRH} in this subsection.  First, we note that it is easy to extend \mbox{CRH} to learn nonlinear hash functions via the kernel trick~\cite{shawe2004book}. Specifically, according to the generalized representer theorem~\cite{scholkopf2001colt}, we can represent the projection vectors $\w_{x}$ and $\w_{y}$ as
+\begin{align}
+\w_{x} = \sum\nolimits_{i=1}^{I}\alpha_{i}\phi_{x}(\x_i) \ \ \mbox{and} \ \ \w_{y} = \sum\nolimits_{j=1}^{J}\beta_{j}\phi_{y}(\y_j),\nonumber
+\end{align}
+where $\phi_{x}(\cdot)$ and $\phi_{y}(\cdot)$ are kernel-induced feature maps for modalities $\mathcal{X}$ and $\mathcal{Y}$, respectively. Then the objective function~(\ref{eqn:loss}) can be expressed in kernel form and kernel-based hash functions can be learned by minimizing a new but very similar objective function.
+%Because we do not use kernel in our experiments and discussion, and kernel is extremely important for machine learning and vision problems, we should clearly talk about the kernel extension and convince the reviewers.
+
+%\subsection{Beyond Two Modalities}
+
+Another possible extension is to make \mbox{CRH} support more than two modalities. Taking a new modality $\mathcal{Z}$ for example, we need to incorporate into Equation~(\ref{eqn:loss}) the following terms: loss and regularization terms for $\mathcal{Z}$, and all pairwise loss terms involving $\mathcal{Z} $ and other modalities, e.g., $\mathcal{X} $ and $\mathcal{Y}$.
+
+For both extensions, it is straightforward to adapt the algorithm presented above to solve the new optimization problems.
+
+%*******************************************************************************
+\subsection{Discussion}
+\mbox{CRH} is closely related to a recent multimodal metric learning method called MultiNPP~\cite{quadrianto2011icml}, because \mbox{CRH} uses a loss function for inter-modality point pairs which is similar to MultiNPP. However, \mbox{CRH} is a general framework and other loss functions for inter-modality point pairs can also be adopted. The two methods have at least three significant differences.  First, our focus is on \mbox{HFL} while MultiNPP is on metric learning through embedding. Second, in addition to the inter-modality loss term, the objective function in \mbox{CRH} includes two intra-modality loss terms for large margin HFL while MultiNPP only has a loss term for the inter-modality point pairs.
+Third, CRH uses boosting to sequentially learn the hash functions but MultiNPP does not take this aspect into consideration. 
+
+As discussed briefly in~\cite{quadrianto2011icml}, one may first use MultiNPP to map multimodal data into a common real space and then apply any unimodal \mbox{HFL} method for multimodal hashing. However, this naive two-stage approach has some limitations.  First, both stages can introduce information loss which impairs the quality of the hash functions learned.  Second, a two-stage approach generally needs more computational resources.  These two limitations can be overcome by using a one-stage method such as \mbox{CRH}.
+
+% % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
+\section{Experiments}
+\label{crh:exps}
+
+%-------------------------------------------------------------------------------
+\subsection{Experimental Settings}
+
+In our experiments, we compare \mbox{CRH} with two state-of-the-art multimodal hashing methods, namely, \mbox{CMSSH}~\cite{bronstein2010cvpr}\footnote{We used the implementation generously provided by the authors.} and \mbox{CVH}~\cite{kumar2011ijcai},\footnote{We implemented the method ourselves because the code is not publicly available.} for two crossmodal retrieval tasks: (1)~\textit{image query vs.\ text database}; (2)~\textit{text query vs.\ image database}. The goal of each retrieval task is to find from the text (image) database the nearest neighbors for the image (text) query.
+
+%\footnote{We have tried several two-stage methods which combine  \mbox{Multi-NPP} and some representative unimodal \mbox{HFL} methods, e.g., \mbox{Multi-NPP+SH} and \mbox{Multi-NPP+LSH}, but did not obtain comparable results. We do not report them in the paper due to page limitations.}
+
+We use two benchmark data sets which are, to the best of our knowledge, the largest fully paired and labeled multimodal data sets. We further divide each data set into a database set and a query set. To train the models, we randomly select a group of documents from the database set to form the training set. Moreover, we randomly select 0.1\% of the point pairs from the training set. For fair comparison, all models are trained on the same training set and the experiments are repeated 5 times.
+%\footnote{*** Do you mean: we randomly select 0.1\% of the point pairs from the training set?}
+%$$\mbox{AP} = \frac{1}{L}\sum_{r=1}^{R} P(r) \, \delta(r),$$
+
+The mean average precision (\mbox{mAP}) is used as the performance measure. To compute the \mbox{mAP}, we first evaluate the average precision (\mbox{AP}) of a set of $R$ retrieved documents as $\mbox{AP} = \frac{1}{L}\sum_{r=1}^{R} P(r) \, \delta(r)$, where $L$ is the number of true neighbors in the retrieved set, $P(r)$ denotes the precision of the top $r$ retrieved documents, and $\delta(r)=1$ if the $r$th retrieved document is a true neighbor and $\delta(r)=0$ otherwise.  The \mbox{mAP} is then computed by averaging the \mbox{AP} values over all the queries in the query set. The larger the \mbox{mAP}, the better the performance. In the experiments, we set $R=50$. Besides, we also report the precision and recall within a fixed Hamming radius.
+
+We use cross-validation to choose the parameters for \mbox{CRH} and find that the model performance is only mildly sensitive to the parameters. As a result, in all experiments, we set $\lambda_{x}=0.01, \lambda_{y}=0.01, \gamma = 1000, a=3.7$, and $\lambda=1/a$. Besides, unless specified otherwise, we fix the training set size to $2{,}000$ and the code length $K$ to 24.
+
+%Our model is mildly sensitive to the parameters. 
+
+%*******************************************************************************
+\subsection{Results on \mbox{Wiki} Data Set}
+
+The \mbox{Wiki} data set, generated from Wikipedia featured articles, consists of $2{,}866$ image-text pairs.\footnote{\url{http://www.svcl.ucsd.edu/projects/crossmodal/}} In each pair, the text is an article describing some events or people and the image is closely related to the content of the article. The images are represented by 128-dimensional \mbox{SIFT}~\cite{lowe2004ijcv} feature vectors, while the text articles are represented by the probability distributions over 10 topics learned by a latent Dirichlet allocation (\mbox{LDA}) model~\cite{blei2003jmlr}. Each pair is labeled with one of 10 semantic classes.  We simply use these class labels to identify the neighbors. Moreover, we use 80\% of the data as the database set and the remaining 20\% to form the query set.
+
+The mAP values of the three methods and a method based on binarizing MultiNPP (Bin-MultiNPP) are reported in Table~\ref{crh:table:wiki-compare-map}.  We can see that \mbox{CRH} outperforms \mbox{CVH} and \mbox{CMSSH} under all settings and \mbox{CVH} performs slightly better than \mbox{CMSSH}.  We note that \mbox{CMSSH} ignores the intra-modality relational information and \mbox{CVH} simply treats each bit independently.  Hence the performance difference is expected. Also, we can see that binarizing MultiNPP directly always achieves the worst performance.
+
+%\vspace{-0.4cm}
+%\begin{table}[htb] 
+%\caption{\mbox{mAP} comparison on \mbox{Wiki}} %\vspace{0.05in}
+%\label{crh:table:wiki-compare-map}
+%\begin{center}
+%\begin{tabular}{|c|c|c|c|}
+%\toprule[1pt]\addlinespace[0pt]
+%\multirow{2}{7em}{\centering Task}&\multirow{2}{1.5cm}{\centering Method}&\multicolumn{2}{|c|}{Code Length}\\
+%\cline{3-4}
+%& &  $K=24$&  $K=48$\\
+%\addlinespace[0pt]\midrule[1pt]\addlinespace[0pt]
+%\multirow{3}{7em}{\centering Image Query \\ vs. \\Text Database}
+%&\mbox{CRH}&${\bf 0.2607}$&${\bf 0.2393}$\\
+%\cline{2-4}
+%&\mbox{CVH}&${{0.1843}}$&${0.1894}$\\
+%\cline{2-4}
+%&\mbox{CMSSH}&${0.1785}$&${0.1666}$\\
+%%\cline{2-4}
+%%&\mbox{MultiNPP+SH}&${0.1577}$&${0.1577}$\\
+%\addlinespace[0pt]\midrule[0.7pt]\addlinespace[0pt]
+%\multirow{3}{7em}{\centering Text Query \\ vs. \\Image Database}
+%&\mbox{CRH}&${\bf{0.3407}}$&${\bf 0.3167}$\\
+%\cline{2-4}
+%&\mbox{CVH}&${0.2839}$&${0.1812}$\\
+%\cline{2-4}
+%&\mbox{CMSSH}&${0.1977}$&${0.2030}$\\
+%%\cline{2-4}
+%%&\mbox{MultiNPP+SH}&${0.1577}$&${0.1577}$\\
+%\addlinespace[0pt]\bottomrule[1pt]
+%\end{tabular} %\vspace{-0.25cm}
+%\end{center}
+%\end{table}
+
+\begin{table}[htb] 
+\caption{\mbox{mAP} comparison on \mbox{Wiki}}\label{crh:table:wiki-compare-map}\vspace{-0.5cm}
+\begin{center}
+{\small
+\begin{tabular}{|c|c|c|c|c|}
+\toprule[1pt]\addlinespace[0pt]
+\multirow{2}{7em}{\centering Task}&\multirow{2}{1.5cm}{\centering Method}&\multicolumn{3}{|c|}{Code Length}\\
+\cline{3-5}
+& &  $K=24$&  $K=48$&  $K=64$\\
+\addlinespace[0pt]\midrule[1pt]\addlinespace[0pt]
+\multirow{4}{7em}{\centering Image Query \\ vs. \\Text Database}
+&\mbox{CRH}&${\bf 0.2537\pm0.0206}$&${\bf 0.2399\pm0.0185}$&${\bf 0.2392\pm0.0131}$\\
+\cline{2-5}
+&\mbox{CVH}&${{0.2043\pm0.0150}}$&${0.1788\pm 0.0149}$&${0.1732\pm0.0072}$\\
+\cline{2-5}
+&\mbox{CMSSH}&${0.1965\pm 0.0123}$&${0.1780\pm0.0080}$&${0.1624\pm0.0073}$\\
+\cline{2-5}
+&\mbox{Bin-MultiNPP}&${0.1790\pm 0.0202}$&${0.1672\pm0.0130}$&${0.1628\pm0.0175}$\\
+\addlinespace[0pt]\midrule[0.7pt]\addlinespace[0pt]
+\multirow{4}{7em}{\centering Text Query \\ vs. \\Image Database}
+&\mbox{CRH}&${\bf{0.2896\pm0.0214}}$&${\bf 0.2882\pm0.0261}$&${\bf 0.2989\pm0.0293}$\\
+\cline{2-5}
+&\mbox{CVH}&${0.2714\pm0.0164}$&${0.2304\pm0.0104}$&${0.2156\pm0.0202}$\\
+\cline{2-5}
+&\mbox{CMSSH}&${0.2179\pm 0.0161}$&${0.2094\pm0.0072}$&${0.2040\pm0.0135}$\\
+\cline{2-5}
+&\mbox{Bin-MultiNPP}&${0.1925\pm0.0173}$&${0.1927\pm0.0284}$&${0.1847\pm0.0195}$\\
+\addlinespace[0pt]\bottomrule[1pt]
+\end{tabular} \vspace{-0.25cm}
+}
+\end{center}
+\end{table}
+
+\begin{figure}[ht]
+\begin{center}
+\subfigure[Varying Code Length]{\label{crh:fig:wiki-code-xy}
+    \begin{minipage}[b]{0.45\linewidth} %\vspace{-0.3cm}
+%        \centering\vspace{-1cm}
+        \epsfig{figure=fig/crh/wiki-comp-code-xy, width=0.8\textwidth}%, height=3.4cm} %\vspace{-1.5cm}
+    \end{minipage}}
+\subfigure[Varying Code Length]{\label{crh:fig:wiki-code-yx}
+    \begin{minipage}[b]{0.45\linewidth} %\vspace{-0.3cm}
+%        \centering\vspace{-1cm}
+        \epsfig{figure=fig/crh/wiki-comp-code-yx, width=0.8\textwidth}%, height=3.4cm} %\vspace{-1.5cm}
+    \end{minipage}}
+\\
+\subfigure[Varying Training Set]{\label{crh:fig:wiki-train-xy}
+    \begin{minipage}[b]{0.45\linewidth} %\vspace{-0.3cm}
+%        \centering\vspace{-1cm}
+        \epsfig{figure=fig/crh/wiki-comp-train-xy, width=0.8\textwidth}%, height=3.4cm} %\vspace{-1.5cm}
+    \end{minipage}}
+\subfigure[Varying Training Set]{\label{crh:fig:wiki-train-yx}
+    \begin{minipage}[b]{0.45\linewidth} %\vspace{-0.3cm}
+%        \centering\vspace{-1cm}
+        \epsfig{figure=fig/crh/wiki-comp-train-yx, width=0.8\textwidth}%, height=3.4cm} %\vspace{-1.5cm}
+    \end{minipage}}
+\\
+\subfigure[Pre-Rec Curve]{\label{crh:fig:wiki-pr-xy}
+    \begin{minipage}[b]{0.45\linewidth} %\vspace{-0.3cm}
+%        \centering\vspace{-1cm}
+        \epsfig{figure=fig/crh/wiki-comp-pr-xy, width=0.8\textwidth}%, height=3.4cm} %\vspace{-1.5cm}
+    \end{minipage}}
+\subfigure[Pre-Rec Curve]{\label{crh:fig:wiki-pr-yx}
+    \begin{minipage}[b]{0.45\linewidth} %\vspace{-0.3cm}
+%        \centering\vspace{-1cm}
+        \epsfig{figure=fig/crh/wiki-comp-pr-yx, width=0.8\textwidth}%, height=3.4cm} %\vspace{-1.5cm}
+    \end{minipage}}
+\\
+\subfigure[Recall Curve]{\label{crh:fig:wiki-rec-xy}
+    \begin{minipage}[b]{0.45\linewidth} %\vspace{-0.3cm}
+%        \centering\vspace{-1cm}
+        \epsfig{figure=fig/crh/wiki-comp-rec-xy, width=0.8\textwidth}%, height=3.4cm} %\vspace{-1.5cm}
+    \end{minipage}}
+\subfigure[Recall Curve]{\label{crh:fig:wiki-rec-yx}
+    \begin{minipage}[b]{0.45\linewidth} %\vspace{-0.3cm}
+%        \centering\vspace{-1cm}
+        \epsfig{figure=fig/crh/wiki-comp-rec-yx, width=0.8\textwidth}%, height=3.4cm} %\vspace{-1.5cm}
+    \end{minipage}} %\vspace{-0.2cm}
+\end{center} \vspace{-0.5cm}
+\caption{Results on \mbox{Wiki}}\label{crh:fig:wiki-compare-curve}
+\end{figure}
+
+We further compare the three methods on several aspects in Figure~\ref{crh:fig:wiki-compare-curve}. We first vary the code length $K$ and plot the precision within a Hamming radius of 2 in subfigures~\ref{crh:fig:wiki-code-xy} and~\ref{crh:fig:wiki-code-yx}. As $K$ increases, the performance of \mbox{CRH} also improves but the other two methods cannot benefit from increasing $K$. We then vary the size of the training set in subfigures~\ref{crh:fig:wiki-train-xy} and~\ref{crh:fig:wiki-train-yx}. Although \mbox{CVH} performs the best when the training set is small, its performance is gradually surpassed by \mbox{CRH} as the size increases.  In the remaining subfigures, we plot the precision-recall curves and recall curves for all three methods. It is obvious that \mbox{CRH} outperforms its two counterparts by a large margin.
+
+%The precision-recall curves and recall curves show that \mbox{CRH} achieves the best performance. We set the code length $K=24$ and training set size $2{,}000$ to get the figures, if not specifically indicated.
+
+
+%The first row is for the task of \textit{image query vs.\ text database} and the second row is for the task of \textit{text query vs.\ image database}.
+
+%*******************************************************************************
+\subsection{Results on \mbox{Flickr} Data Set}
+
+The \mbox{Flickr} data set consists of $186{,}577$ image-tag pairs  pruned from the \mbox{NUS} data set\footnote{\url{http://lms.comp.nus.edu.sg/research/NUS-WIDE.htm}}~\cite{nus-wide-civr09} by keeping the pairs that belong to one of the 10 largest classes. The images are represented by 500-dimensional \mbox{SIFT} vectors. To obtain more compact representations of the tags, we perform \mbox{PCA} on the original tag occurrence features and obtain 1000-dimensional feature vectors. Each pair is annotated by at least one of 10 semantic labels, and two points are defined as neighbors if they share at least one label. We use 99\% of the data as the database set and the remaining 1\% to form the query set.
+
+
+The mAP values of the three methods are reported in Table~\ref{crh:table:flickr-compare-map}. In the task of image query vs. text database, \mbox{CRH} performs comparably to \mbox{CMSSH}, which is better than \mbox{CVH}. However, in the other task, \mbox{CRH} achieves the best performance. At the same time, we observe that CRH beat Bin-MultiNPP by a large margin.
+
+
+%\vspace{-0.5cm}
+%\begin{table}[htb] %
+%\caption{\mbox{mAP} comparison on \mbox{Flickr}} %\vspace{0.05in}
+%\label{crh:table:flickr-compare-map}
+%\begin{center}
+%\begin{tabular}{|c|c|c|c|}
+%\toprule[1pt]\addlinespace[0pt]
+%\multirow{2}{7em}{\centering Task}&\multirow{2}{1.5cm}{\centering Method}&\multicolumn{2}{|c|}{Code Length}\\
+%\cline{3-4}
+%& &  $K=24$&  $K=48$\\
+%\addlinespace[0pt]\midrule[1pt]\addlinespace[0pt]
+%\multirow{3}{7em}{\centering Image Query \\ vs. \\Text Database}
+%&\mbox{CRH}&${\bf 0.5393}$&${0.5336}$\\
+%\cline{2-4}
+%&\mbox{CVH}&${{0.4704}}$&${0.4512}$\\
+%\cline{2-4}
+%&\mbox{CMSSH}&${0.5356}$&${\bf 0.5361}$\\
+%%\cline{2-4}
+%%&\mbox{MultiNPP+SH}&${0.}$&${0.}$\\
+%\addlinespace[0pt]\midrule[0.7pt]\addlinespace[0pt]
+%\multirow{3}{7em}{\centering Text Query \\ vs. \\Image Database}
+%&\mbox{CRH}&${\bf{0.5244}}$&${\bf 0.5170}$\\
+%\cline{2-4}
+%&\mbox{CVH}&${0.4560}$&${0.4511}$\\
+%\cline{2-4}
+%&\mbox{CMSSH}&${0.4970}$&${0.4790}$\\
+%%\cline{2-4}
+%%&\mbox{MultiNPP+SH}&${0.}$&${0.}$\\
+%\addlinespace[0pt]\bottomrule[1pt]
+%\end{tabular}
+%\end{center} %
+%\end{table}
+%\vspace{-0.2cm}
+
+
+\begin{table}[htb] %
+\caption{\mbox{mAP} comparison on \mbox{Flickr}}\label{crh:table:flickr-compare-map}\vspace{-0.5cm}
+\begin{center}
+{\small
+\begin{tabular}{|c|c|c|c|c|}
+\toprule[1pt]\addlinespace[0pt]
+\multirow{2}{7em}{\centering Task}&\multirow{2}{1.5cm}{\centering Method}&\multicolumn{3}{|c|}{Code Length}\\
+\cline{3-5}
+& &  $K=24$&  $K=48$&  $K=64$\\
+\addlinespace[0pt]\midrule[1pt]\addlinespace[0pt]
+\multirow{4}{7em}{\centering Image Query \\ vs. \\Text Database}
+&\mbox{CRH}&${0.5259\pm 0.0094}$&${0.4990\pm 0.0075}$&${\bf 0.4929\pm 0.0064}$\\
+\cline{2-5}
+&\mbox{CVH}&${{0.4717\pm0.0035}}$&${0.4515\pm0.0041}$&$0.4471\pm 0.0023$\\
+\cline{2-5}
+&\mbox{CMSSH}&${\bf 0.5287\pm 0.0123}$&${\bf 0.5098\pm0.0141}$&$0.4911\pm 0.0220$\\
+\cline{2-5}
+&\mbox{Bin-MultiNPP}&${0.4775\pm0.0211}$&${0.4527\pm 0.0143}$&${0.4446\pm0.0259}$\\
+\addlinespace[0pt]\midrule[0.7pt]\addlinespace[0pt]
+\multirow{4}{7em}{\centering Text Query \\ vs. \\Image Database}
+&\mbox{CRH}&${\bf{0.5364\pm 0.0021}}$&${\bf 0.5185\pm 0.0050}$&${\bf 0.5064\pm 0.0055}$\\
+\cline{2-5}
+&\mbox{CVH}&${0.4598\pm0.0020}$&${0.4519\pm0.0029}$&$0.4477\pm0.0058$\\
+\cline{2-5}
+&\mbox{CMSSH}&${0.5029\pm 0.0321}$&${0.4815\pm 0.0101}$&$0.4660\pm0.0298$\\
+\cline{2-5}
+&\mbox{Bin-MultiNPP}&${0.4767\pm 0.0147}$&${0.4524\pm 0.0115}$&${0.4450\pm0.0125}$\\
+\addlinespace[0pt]\bottomrule[1pt]
+\end{tabular}
+}
+\end{center} %
+\end{table}
+
+Similar to the previous subsection, we have conducted a group of experiments to compare the three methods on several aspects and report the results in Figure~\ref{crh:fig:flickr-compare-curve}. We first compare the precision under different code lengths in subfigures~\ref{crh:fig:flickr-code-xy} and~\ref{crh:fig:flickr-code-xy}. In almost all code lengths, \mbox{CRH} outperforms the other two methods. The results for varying the size of the training set are plotted in subfigures~\ref{crh:fig:flickr-train-xy} and~\ref{crh:fig:flickr-train-xy}. As more training data are used, \mbox{CRH} always performs better but the performance of \mbox{CVH} and \mbox{CMSSH} has high variance. Finally, the precision-recall curves and recall curves are shown in the remaining subfigures. Similar to the results on \mbox{Wiki}, \mbox{CRH} performs the best. However, the performance gap is smaller here.
+
+%that \mbox{CRH} achieves the best performance. We set the code length $K=24$ and training set size $2{,}000$ to get the figures, if not specifically indicated.
+
+\begin{figure}[ht]
+\begin{center}
+\subfigure[Varying Code Length]{\label{crh:fig:flickr-code-xy}
+    \begin{minipage}[b]{0.45\linewidth} %\vspace{-0.3cm}
+%        \centering\vspace{-1cm}
+        \epsfig{figure=fig/crh/flickr-comp-code-xy, width=0.8\textwidth}%, height=3.4cm} %\vspace{-1.5cm}
+    \end{minipage}}
+\subfigure[Varying Code Length]{\label{crh:fig:flickr-code-yx}
+    \begin{minipage}[b]{0.45\linewidth} %\vspace{-0.3cm}
+%        \centering\vspace{-1cm}
+        \epsfig{figure=fig/crh/flickr-comp-code-yx, width=0.8\textwidth}%, height=3.4cm} %\vspace{-1.5cm}
+    \end{minipage}}
+\\
+\subfigure[Varying Training Set]{\label{crh:fig:flickr-train-xy}
+    \begin{minipage}[b]{0.45\linewidth} %\vspace{-0.3cm}
+%        \centering\vspace{-1cm}
+        \epsfig{figure=fig/crh/flickr-comp-train-xy, width=0.8\textwidth}%, height=3.4cm} %\vspace{-1.5cm}
+    \end{minipage}}
+\subfigure[Varying Training Set]{\label{crh:fig:flickr-train-yx}
+    \begin{minipage}[b]{0.45\linewidth} %\vspace{-0.3cm}
+%        \centering\vspace{-1cm}
+        \epsfig{figure=fig/crh/flickr-comp-train-yx, width=0.8\textwidth}%, height=3.4cm} %\vspace{-1.5cm}
+    \end{minipage}}
+\\
+\subfigure[Pre-Rec Curve]{\label{crh:fig:flickr-pr-xy}
+    \begin{minipage}[b]{0.45\linewidth} %\vspace{-0.3cm}
+%        \centering\vspace{-1cm}
+        \epsfig{figure=fig/crh/flickr-comp-pr-xy, width=0.8\textwidth}%, height=3.4cm} %\vspace{-1.5cm}
+    \end{minipage}}
+\subfigure[Pre-Rec Curve]{\label{crh:fig:flickr-pr-yx}
+    \begin{minipage}[b]{0.45\linewidth} %\vspace{-0.3cm}
+%        \centering\vspace{-1cm}
+        \epsfig{figure=fig/crh/flickr-comp-pr-yx, width=0.8\textwidth}%, height=3.4cm} %\vspace{-1.5cm}
+    \end{minipage}}
+\\
+\subfigure[Recall Curve]{\label{crh:fig:flickr-rec-xy}
+    \begin{minipage}[b]{0.45\linewidth} %\vspace{-0.3cm}
+%        \centering\vspace{-1cm}
+        \epsfig{figure=fig/crh/flickr-comp-rec-xy, width=0.8\textwidth}%, height=3.4cm} %\vspace{-1.5cm}
+    \end{minipage}}
+\subfigure[Recall Curve]{\label{crh:fig:flickr-rec-yx}
+    \begin{minipage}[b]{0.45\linewidth} %\vspace{-0.3cm}
+%        \centering\vspace{-1cm}
+        \epsfig{figure=fig/crh/flickr-comp-rec-yx, width=0.8\textwidth}%, height=3.4cm} %\vspace{-1.5cm}
+    \end{minipage}}
+\end{center}\vspace{-0.5cm}
+\caption{Results on \mbox{Flickr}}\label{crh:fig:flickr-compare-curve}
+ %\vspace{-0.4cm}
+\end{figure}
+%%\subsubsection{Discussion}
+%%\label{MH:exps:disc}
+
+
+%\subsection{Results on MIRFlickr Data Set}
+%
+%The MIRFlickr data set is ffered by the LIACS Medialab at Leiden University, The Netherlands.\footnote{\url{http://press.liacs.nl/mirflickr/}} There are 1 million images downloaded from the flickr.com, and each image is represented by two different descriptors, that is, the 150 dimensional EH descriptor and the 43 dimensional HT descriptor. Each image is also labeled with several tags. There are in total $1{,}386$ tags based on which we define similarity, meaning that we label two images as similar if the share one or more tags and dissimilar otherwise. We randomly choose $5{,}000$ points to form the query set and use the remaining data as the database set.
+%
+%The averaged precision values within the Hamming radius 2 are reported in Table~\ref{table:flickr1m-compare-precision}.
+%
+%\begin{table}[htb] %
+%\caption{Precision comparison on \mbox{MIRFlickr}}\label{table:flickr1m-compare-precision} \vspace{-0.5cm}
+%\begin{center}
+%{\small
+%\begin{tabular}{|c|c|c|c|c|}
+%\toprule[1pt]\addlinespace[0pt]
+%\multirow{2}{7em}{\centering Task}&\multirow{2}{1.5cm}{\centering Method}&\multicolumn{3}{|c|}{Code Length}\\
+%\cline{3-5}
+%& &  $K=24$&  $K=48$&  $K=64$\\
+%\addlinespace[0pt]\midrule[1pt]\addlinespace[0pt]
+%\multirow{4}{7em}{\centering Image Query \\ vs. \\Text Database}
+%&\mbox{CRH}&${\bf 0.\pm 0.}$&${0.\pm 0.}$&${0.\pm 0.}$\\
+%\cline{2-5}
+%&\mbox{CVH}&${{0.}}$&${0.}$&\\
+%\cline{2-5}
+%&\mbox{CMSSH}&${0.}$&${\bf 0.}$&\\
+%\cline{2-5}
+%&\mbox{Bin-MultiNPP}&${0.}$&${0.}$&\\
+%\addlinespace[0pt]\midrule[0.7pt]\addlinespace[0pt]
+%\multirow{4}{7em}{\centering Text Query \\ vs. \\Image Database}
+%&\mbox{CRH}&${\bf{0.\pm 0.}}$&${\bf 0.\pm 0.}$&${0.\pm 0.}$\\
+%\cline{2-5}
+%&\mbox{CVH}&${0.}$&${0.}$&\\
+%\cline{2-5}
+%&\mbox{CMSSH}&${0.}$&${0.}$&\\
+%\cline{2-5}
+%&\mbox{Bin-MultiNPP}&${0.}$&${0.}$&\\
+%\addlinespace[0pt]\bottomrule[1pt]
+%\end{tabular}
+%}
+%\end{center} %
+%\end{table}
+
+%The four different aspects are studied in Figure~\ref{crh:fig:flickr1m-compare-curve}.
+%
+%\begin{figure}[ht]
+%\begin{center}
+%\subfigure[Varying Code Length]{\label{crh:fig:flickr1m-code-xy}
+%    \begin{minipage}[b]{0.45\linewidth} %\vspace{-0.3cm}
+%%        \centering\vspace{-1cm}
+%        \epsfig{figure=fig/crh/flickr-comp-code-xy, width=0.8\textwidth}%, height=3.4cm} %\vspace{-1.5cm}
+%    \end{minipage}}
+%\subfigure[Varying Training Set]{\label{crh:fig:flickr1m-train-xy}
+%    \begin{minipage}[b]{0.45\linewidth} %\vspace{-0.3cm}
+%%        \centering\vspace{-1cm}
+%        \epsfig{figure=fig/crh/flickr-comp-train-xy, width=0.8\textwidth}%, height=3.4cm} %\vspace{-1.5cm}
+%    \end{minipage}}
+%\subfigure[Pre-Rec Curve]{\label{crh:fig:flickr1m-pr-xy}
+%    \begin{minipage}[b]{0.45\linewidth} %\vspace{-0.3cm}
+%%        \centering\vspace{-1cm}
+%        \epsfig{figure=fig/crh/flickr-comp-pr-xy, width=0.8\textwidth}%, height=3.4cm} %\vspace{-1.5cm}
+%    \end{minipage}}
+%\subfigure[Recall Curve]{\label{crh:fig:flickr1m-rec-xy}
+%    \begin{minipage}[b]{0.45\linewidth} %\vspace{-0.3cm}
+%%        \centering\vspace{-1cm}
+%        \epsfig{figure=fig/crh/flickr-comp-rec-xy, width=0.8\textwidth}%, height=3.4cm} %\vspace{-1.5cm}
+%    \end{minipage}}
+%    \\
+%\subfigure[Varying Code Length]{\label{crh:fig:flickr1m-code-yx}
+%    \begin{minipage}[b]{0.45\linewidth} %\vspace{-0.3cm}
+%%        \centering\vspace{-1cm}
+%        \epsfig{figure=fig/crh/flickr-comp-code-yx, width=0.8\textwidth}%, height=3.4cm} %\vspace{-1.5cm}
+%    \end{minipage}}
+%\subfigure[Varying Training Set]{\label{crh:fig:flickr1m-train-yx}
+%    \begin{minipage}[b]{0.45\linewidth} %\vspace{-0.3cm}
+%%        \centering\vspace{-1cm}
+%        \epsfig{figure=fig/crh/flickr-comp-train-yx, width=0.8\textwidth}%, height=3.4cm} %\vspace{-1.5cm}
+%    \end{minipage}}
+%\subfigure[Pre-Rec Curve]{\label{crh:fig:flickr1m-pr-yx}
+%    \begin{minipage}[b]{0.45\linewidth} %\vspace{-0.3cm}
+%%        \centering\vspace{-1cm}
+%        \epsfig{figure=fig/crh/flickr-comp-pr-yx, width=0.8\textwidth}%, height=3.4cm} %\vspace{-1.5cm}
+%    \end{minipage}}
+%\subfigure[Recall Curve]{\label{crh:fig:flickr1m-rec-yx}
+%    \begin{minipage}[b]{0.45\linewidth} %\vspace{-0.3cm}
+%%        \centering\vspace{-1cm}
+%        \epsfig{figure=fig/crh/flickr-comp-rec-yx, width=0.8\textwidth}%, height=3.4cm} %\vspace{-1.5cm}
+%    \end{minipage}}\vspace{-0.2cm}
+%\end{center}
+%\caption{Results on \mbox{Flickr}}\label{crh:fig:flickr1m-compare-curve}
+% %\vspace{-0.4cm}
+%\end{figure}
+
+%-------------------------------------------------------------------------------
+\section{Conclusion}
+\label{crh:conclusion}
+
+In this chapter, we have presented a novel method for multimodal hash function learning based on a boosted co-regularization framework which is named co-regularized hashing (CRH). In \mbox{CRH}, there is no data assumption such as those the data are aligned or organized in graphs. Because the objective function of the optimization problem is in the form of a difference of convex functions, we develop an efficient learning algorithm based on \mbox{CCCP} and a stochastic gradient method.  Experimental study based on two benchmark data sets shows that \mbox{CRH} outperforms two state-of-the-art multimodal hashing methods.
+
+To take this work further, we would like to conduct theoretical analysis of \mbox{CRH} and apply it to some other tasks such as multimodal medical image alignment. Another possible research issue is to develop sublinear optimization algorithms to further improve the scalability of \mbox{CRH}.
+

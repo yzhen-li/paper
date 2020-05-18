@@ -1,0 +1,502 @@
+
+\chapter{Background}
+\label{chap:background}
+
+The history of hashing may be as long as the history of computer science. Hashing methods were originally used to implement dynamic sets that support only the dictionary operations such as insert, search, and delete~\cite{cormen2001book}. Conventionally, people design hash functions which map objects to bins and then construct hash tables. With the hash tables, fast dictionary operations can be performed. For example, the expected time complexity of searching an element in a hash table is only $ O(1) $, although it can be $ \Theta(N) $ in the worst case. A good hash table should have a low collision rate and use as little storage as possible.
+
+In recent years, hashing has been introduced in several new problems such as similarity search~\cite{gionis1999vldb,salakhutdinov2009ijar} and data compression~\cite{shi2009aistats,weinberger2009icml,li2011nips}. In this thesis, our focus is hashing for similarity search.
+Unlike conventional hashing methods, hashing-based similarity search methods use collision to incorporate similarity. These methods are common in indexing objects using binary codes, making search extremely fast (without much loss of accuracy) even on very large data sets.
+
+Depending on whether or not machine learning techniques are applied to design the hash functions, existing hashing-based methods can be grouped into two categories: locality sensitive hashing (\aka non-learning based hashing) and hash function learning (\aka learning based hashing). While locality sensitive hashing methods have enjoyed great success over past decades, most of them are data independent and often generate very long hash codes which are practically inefficient for large-scale applications. On the contrary, hash function learning methods learn from data hash functions which reflect data characteristics more accurately and generate very compact codes. As a result, \mbox{HFL} methods are more desirable in real applications. 
+
+To provide a solid background for this thesis, in this chapter, we review the literature of hashing-based methods for similarity search, and two machine learning areas, namely, active learning and metric learning, which are closely related to the methods we introduce later. Specifically, in Section~\ref{background:lsh}, we give a brief introduction of locality sensitive hashing, which is then followed by a survey of hash function learning in Section~\ref{background:hfl}. Section~\ref{background:metric} and Section~\ref{background:active} present a summarization of metric learning and active learning, separately. Finally, we summarize the chapter in Section~\ref{background:sum}.
+
+%-------------------------------------------------------------------------------
+\section{Locality Sensitive Hashing}
+\label{background:lsh}
+
+The family of \textit{locality sensitive hashing} (\mbox{LSH}) algorithms have been a hot research topic since the 1990s. In this section, we briefly introduce some well-known methods. For a detailed review, the readers are referred to~\cite{andoni2006focs}. 
+
+The concept of \mbox{LSH} is very simple, that is, it aims to hash objects\footnote{In this paper, we use objects, points and documents interchangeably.} using a number of hash functions to ensure that, for each function, the collision probability for objects that are close to each other is much higher than that for far apart objects~\cite{indyk1998stoc}. In other words, given a family of hash functions $\mathcal{H}$ and two objects $ \p $ and $ \q $, \mbox{LSH}~\cite{charikar2002stoc} requires that 
+$$ P_{\mathcal{H}}[h(\p)=h(\q)] = \mathit{sim}(\p, \q),$$
+where $ h $ is a hash function randomly selected from $\mathcal{H}$, $ P(\cdot) $ indicates the probability and $ \mathit{sim}(\cdot,\cdot) $ returns a similarity value in the range of $ [0,1] $ based on some metric. Usually, $ h $ has only two hash values $ \{0,1\} $ and \mbox{LSH} uses several hash functions to generate binary codes. Therefore, \mbox{LSH} actually maps data objects from the original feature space to a Hamming space where the Hamming distance incorporates the similarity. It is very efficient to perform the search in the Hamming space via bit operations or data structures such as dictionaries.
+
+%More specifically,  is called ($R,cR, P_{1}, P_{2}$)-sensitive (locality sensitive) if for any two points $\p,\q \in \mathbb{R}^{D}$,
+%\begin{itemize}
+%\item
+%if $\|\p-\q\|\le R$, then $P_{\mathcal{H}}[h(\p)=h(\q)]\ge P_{1}$,
+%\item
+%if $\|\p-\q\|\ge cR$, then $P_{\mathcal{H}}[h(\p)=h(\q)]\le P_{2}$.
+%\end{itemize}
+%
+%In order to be useful, an \mbox{LSH} algorithm has to satisfy $P_{1}>P_{2}$. Actually, all \mbox{LSH} algorithms try to amplify the gap between $P_1$ and $P_2$ by constructing hash functions.
+
+\mbox{LSH} functions are highly dependent on the similarity measures used in the task. Up to now, many \mbox{LSH} functions have been proposed. In the following subsections, we introduce them separately according to the adopted similarity measures.
+
+%are highly dependent on the similarity measure being adopted. Several \mbox{LSH} families have been proposed for different similarity measures, such as the Hamming distance, $\ell_1$ distance, $\ell_s$ distance, Jaccard coefficient and the angle distance. Some examples for each kind of distance are:
+%\begin{description}
+%  \item[Hamming distance] One simple \mbox{LSH} family is $h_i(\p) = p_i, i\in\{1,\dots,D\},\p\in\{0,1\}^{D}$. The locality-sensitive property is $\rho = 1/c.$
+%  
+%  \item[$\ell_1$ distance] The \mbox{LSH} hash functions can be constructed as follows, for a fixed real number $w\gg R$, pick random real numbers $s_1,\dots,s_D\in[0,w)$ and define 
+%  $$h_{s_1,\dots,s_D}(\p) = (\lfloor(p_1-s_1)/w\rfloor,\dots,\lfloor(p_D-s_D)/w\rfloor),\p\in\mathbb{R}^D.$$ The locality-sensitive property is $\rho = 1/c+O(R/w).$
+%  
+%  \item[$\ell_s$ distance] The \mbox{LSH} functions can be constructed as follows, choose a random number $w$ and a random projection vector $\r\in \mathbb{R}^D$ (each of whose coordinates is picked from a Gaussian distribution), then $h_{\r,b}(\p) = \lfloor(\r\cdot \p+b)/w\rfloor$ where $\p\in\mathbb{R}^D$ and $b\in[0,w)$ is random. The
+%locality-sensitive property is $\rho < 1/c$ for some (carefully chosen) finite values of $w$.
+%
+%  \item[Jaccard coefficient] Jaccard coefficient is defined as a similarity metric between two sets $\mathcal{A}$ and $\mathcal{B}$: $s(\mathcal{A},\mathcal{B}) = \frac{|\mathcal{A}\cap \mathcal{B}|}{|\mathcal{A}\cup \mathcal{B}|}$. One \mbox{LSH} family is $h_{\pi}(\mathcal{A}) = \min\{\pi(a)\mid a\in \mathcal{A}\}$, where $\pi$ is a random permutation on the ground universe.
+%  
+%  \item[Angle distance] Angle distance between two points is defined as
+%  $$\Theta(\p,\q) = \arccos\left(\frac{\p\cdot \q}{\|\p\|\cdot\|\q\|}\right),\p,\q\in\mathbb{R}^{D},$$ where $\|\cdot\|$ denotes the vector $\ell_2$ norm. One \mbox{LSH} family for this metric can be constructed as follows, pick a random unit vector $\u$ and define $h_{\u}(\p) = \sgn(\u\cdot \p)$.
+%\end{description}
+
+
+
+%Actually, we should introduce the methods for different similarities.
+%\subsection{Hamming Distance}
+%
+%The seminal work of using hashing for similarity search, we call it Bit Sampling.
+%The seminal work is~\cite{indyk1998stoc}, it is said to be for Hamming distance. and followed by some random projection based methods.
+%
+%What codes does it generate? binary or non-binary?
+
+\subsection{ $\ell_s $ Distance}
+
+The most commonly used distance might be the Euclidean distance (\aka $\ell_2 $ distance). In~\cite{datar2004scg}, \mbox{LSH} functions for the Euclidean distance can be constructed as follows: choose a random number $w$ and a random projection vector $\r\in \mathbb{R}^D$ (each of whose coordinates is picked from a Gaussian distribution), then $h_{\r,b}(\p) = \lfloor(\r\cdot \p+b)/w\rfloor$ where $b\in[0,w)$ is a random threshold and $\p\in\mathbb{R}^D$ is an object to be hashed. There is a publicly available software package which has implemented this algorithm.\footnote{\url{http://www.mit.edu/~andoni/LSH/}} Recently, Dasgupta \etal~\cite{dasgupta2011kdd} further improved the speed of the hash function construction of \mbox{LSH} for Euclidean distance using the Hadamard matrix.
+
+Another common distance is $ \ell_1 $ distance, for which the \mbox{LSH} hash functions are defined as~\cite{andoni2006soda}: for a fixed real number $w\gg R$,\footnote{$ R $ is a user specified number controlling the distance between points which are considered as neighbors.} pick random real numbers $s_1,\dots,s_D\in[0,w)$ and define $h_{s_1,\dots,s_D}(\p) = (\lfloor(p_1-s_1)/w\rfloor,\dots,\lfloor(p_D-s_D)/w\rfloor),\p\in\mathbb{R}^D.$  
+
+Constructions of \mbox{LSH} functions for $ \ell_s $ distance for any $ s\in(0,2] $ are also possible~\cite{datar2004scg}. 
+
+
+
+
+\subsection{Cosine Similarity}
+
+In the data mining and information retrieval communities, especially for documents, the most commonly used metric is cosine similarity. Its value between two vectors $ \p  $ and $ \q  $ is defined as:
+$$\Theta(\p,\q) = \arccos\left(\frac{\p\cdot \q}{\|\p\|\cdot\|\q\|}\right),\p,\q\in\mathbb{R}^{D},$$ where $\|\cdot\|$ denotes the vector $\ell_2$ norm. For this similarity measure, Charikar \etal~\cite{charikar2002stoc} defines the following LSH family: pick a random unit vector $\u$ and define $h_{\u}(\p) = \sgn(\u\cdot \p)$. The hash function can also be viewed as partitioning the space into two half-spaces by a random hyperplane. The collision probability in this case is $ P[h(\p )=h(\q )] = 1-\Theta(\p ,\q )/\pi $.
+
+%Here you should make clear the search procedure, which is also applied in \mbox{KLSH}~\cite{kulis2009iccv}.
+
+Manku \etal~\cite{manku2007www} applied the above mentioned hash functions with some modifications to document de-duplication and named the algorithm \mbox{SimHash}. Since then, \mbox{SimHash} has become one of the most well-known hashing-based methods. \mbox{SimHash} has also been implemented under the framework of \mbox{MapReduce} for cross-lingual pairwise similarity~\cite{ture2011sigir}. Eshghi \etal~\cite{eshghi2008kdd} developed a new \mbox{LSH} family for cosine similarity based on concomitant rank order statistics. 
+
+%This group of work was first for cosine similarity and \mbox{EMD}. They are called SimHash and famous because google used this algorithm.
+%
+%%The procedure for cosine similarity is easy to follow, but for \mbox{EMD} the procedure is hard to follow. But for uniform case, it can be considered a general form of minwise hashing~\cite{broder1998stoc}.
+%
+%For cosine similarity and \mbox{EMD}, we call it SimHash~\cite{charikar2002stoc}, it generates binary codes. But google used this method for document deduplication~\cite{manku2007www}, but I don't know whether it is binary.
+
+\subsection{Jaccard Similarity}
+Jaccard coefficient is widely used to measure similarity between sets. The definition of Jaccard Similarity is: $s(\mathcal{A},\mathcal{B}) = \frac{|\mathcal{A}\cap \mathcal{B}|}{|\mathcal{A}\cup \mathcal{B}|}$, which can be approximated by a simple approach based on random permutations~\cite{broder1997ccs,broder1997www}. Based on this property, Broder \etal proposed the first \mbox{LSH} family for Jaccard similarity which is called minwise Hashing or \mbox{MinHash}~\cite{broder1998stoc}. The hash functions of \mbox{MinHash} can be described simply as follows: $h_{\pi}(\mathcal{A}) = \min\{\pi(a)\mid a\in \mathcal{A}\}$, where $\pi$ is a random permutation on the ground universe. %Actually they come up with a new approximate method for Jaccard similarity. 
+
+%Where does hash play a role?\footnote{Please check~\cite{broder1998stoc} for details and make this part clear.} 
+
+Recently, Li \etal have extended \mbox{MinHash} to generate more compact codes~\cite{li2010www,li2010nips}. Chum \etal~\cite{chum2009cvpr} have proposed a geometric \mbox{MinHash} algorithm and applied it to the image retrieval task. %\footnote{Please check what does this paper say?}
+
+%And give these two papers more detailed information.
+%This group of work is called Minwise Hashing.
+%For set similarity, it generates non-binary codes. Actually this is Jaccard similarity. The seminal work is, followed by
+
+\subsection{Kernel Similarity}
+%\subsubsection{Kernelized LSH}
+
+In many applications, the similarity metric of interest is defined by means of kernels. As a result, developing hashing-based methods for kernel similarity is also very important. For the Pyrimid match kernel, a widely used kernel in vision problems, Pyrimid match hashing~\cite{grauman2007cvpr} was developed. The algorithm can be simply summarized as first generating an embedding of the Pyrimid match kernel, and then using the \mbox{SimHash} to obtain the binary codes for the embedding. Jain \etal~\cite{jain2008cvpr} proposed a similar hashing algorithm for a learned \mbox{Mahalanobis} distance, which is equivalent to a special kernel. More generally, for shift invariant kernels, hash functions can be constructed as follows~\cite{raginsky2009nips}. First get random features using Fourier transforms~\cite{rahimi2007nips} and then threshold them randomly to give the binary codes.
+
+Kulis \etal~\cite{kulis2009iccv} implemented the idea of random projections in the kernel space and formulated \mbox{KLSH}. In general, \mbox{KLSH} uses a random set of points to form random projections and can accommodate any kernels. Recently, \mbox{KLSH} was extended to accept multiple kernels in~\cite{zhang2011mm}.
+
+
+
+%\subsection{Special Cases}
+%%\subsection{Learned Metric}
+%\subsubsection{Non-metric Distance}
+%\subsubsection{Asymmetric Distance}
+\subsection{Summary}
+
+Besides the aforementioned algorithms, \mbox{LSH} functions have also been extended for some special settings, such as asymmetric Hamming distance~\cite{dong2008sigir,gordo2011cvpr} and non-metric similarity~\cite{athitsos2008icde,mu2010aaai}.
+
+Although theoretically effective and efficient, \mbox{LSH} methods have some apparent limitations. Most of all, they are data independent and thus may not reflect the data characteristics accurately. As a result, these methods always generate very long codes which are very inefficient for large-scale data sets and hence of limited practical use. It is this limitation that motivates hash function learning.
+
+
+%LSH families actually do not use bit operations to conduct fast search, they use data structures such as HST~\cite{indyk1998stoc} or some procedure introduced in~\cite{charikar2002stoc}.
+
+
+ % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
+\section{Hash Function Learning}
+\label{background:hfl}
+
+The past five years have witnessed increasingly rapid progress in the topic of hash function learning (\mbox{HFL}), or learning-based hashing. The goal of \mbox{HFL} is to learn, rather than design, the hash functions from data so that the hash functions can generate very compact (short) hash codes. Despite being a young area, a number of \mbox{HFL} methods have been proposed up to now. Depending on how the label information or side-information is used in the learning procedures, we roughly classify these methods into three categories: unsupervised, semi-supervised and supervised methods. 
+%In the following subsections, we present some representative methods in each category.
+
+%\subsection{Embedding-based Approach}
+%\subsubsection{Continuous Embedding Approach}
+%\subsubsection{Discrete Embedding Approach}
+%\subsection{Model-based Approach}
+%\subsubsection{SVM-based}
+%\subsubsection{Boosting-based}
+\subsection{Unsupervised Hash Function Learning}
+Unsupervised \mbox{HFL} methods learn hash functions from unlabeled data only and do not use labels or side-information. Although the model formulations are different from each other, the common idea is to make similar points close to each other and dissimilar points far apart in the Hamming space in which the hash codes live.\footnote{Note that ``similar'' and ``dissimilar'' are determined by features of unlabeled data.}
+
+\subsubsection{Spectral hashing}
+The most well-known unsupervised \mbox{HFL} algorithm should be \textit{spectral hashing} (\mbox{SH}). The objective of \mbox{SH} is similar to one popular dimensionality reduction method called \textit{Laplacian Eigenmap}, meaning that points that are similar in the original feature space should have small distance in the embedded space. However, different from \textit{Laplacian} Eigenmap which embeds data into the Euclidean space, \mbox{SH} maps data into the Hamming space. For a code to be efficient, the authors require that each bit has a 50\% chance of being one or zero, and that different bits are independent of each other. 
+
+Putting all things together, \mbox{SH} is formulated as the following optimization problem:
+\begin{align}
+\min_{\y_i}&~\sum_{ij}W(i,j)\|\y_i-\y_j\|^2\nonumber\\
+\subto&~\y_i\in\{+1,-1\}^{M},~\sum\nolimits_i\nolimits^{N}\y_i=0,~\frac{1}{n}\sum\nolimits_i\nolimits^{N}\y_i\y_i^T=\I,\nonumber
+\end{align}
+where $\y_i$ is the hash code of the $i$th point, $W(i,j)$ is the similarity between the $i$th and $j$th points, $M$ is the length of each code and $ N $ is the number of points. Note that the authors relax the independence assumption and require the bits to be uncorrelated by constraint $ \frac{1}{n}\sum_i\y_i\y_i^T=\I $, because it is hard to enforce independence between bits. Then above problem can be rewritten using matrix notations as follows:
+\begin{align}
+\min_{\Y}&~\tr(\Y^T\mathcal{L}\Y)\nonumber\\
+\subto&~Y_{ij}\in\{+1,-1\}^{M},\Y^T\1=\0,\Y^T\Y=\I,
+\label{problem:sh:original}
+\end{align}
+where $\Y$ is the $N\times M$ code matrix, $\mathcal{L}$ is the graph \textit{Laplacian} defined on the similarity matrix $\W$. 
+
+Actually, the above problem for each single bit is equivalent to a balanced graph partitioning problem and NP-hard, so Problem~(\ref{problem:sh:original}) is NP-hard. However, if we remove the first two constraints, the problem can easily be solved by finding $K$ eigenvectors corresponding to the smallest eigenvalues of $\mathcal{L}$ (ignoring the eigenvector $\1$ corresponding to eigenvalue 0). 
+
+The solution above has two limitations. First, it involves eigen-decomposition which could be very slow when $N$ is large. Moreover, it cannot deal with out-of-sample data points. To overcome these two limitations, the authors use eigenfunctions instead of the eigenvectors. To make the computation tractable, they simply assume that the data points are uniformly distributed in a rectangle and the similarity measure is fixed as $ \exp(\|\x_i-\x_j\|^2/\sigma^2) $. The resultant model is very fast to train and experimental results show that it is superior to \mbox{LSH}. 
+
+Recently, He \etal~\cite{he2010kdd} proposed a kernel extension of \mbox{SH}, which can handle nonvectorial data, incorporate nonlinearity and places no restrictions on the uniform distribution and the fixed similarity measure. Zhang \etal~\cite{zhang2010sigir,zhang2010fgsir} used \mbox{SVM} to enhance \mbox{SH} with the aim of removing the distribution and similarity assumptions.
+
+
+\subsubsection{Binary reconstructive embeddings}
+Kulis \etal~\cite{kulis2009nips} developed another unsupervised \mbox{HFL} algorithm, namely, \textit{binary reconstructive embeddings} (\mbox{BRE}), based on explicitly minimizing the reconstruction error between the original distance and the Hamming distance of the corresponding binary hash codes. \mbox{BRE} can be easily kernelized and does not require restrictive assumptions about the underlining data distribution.
+
+Specifically, let $M$ be the number of hash functions (\aka code length), $N$ be the number of data points, and $Q$ be the number of landmark points. Given a data set $\mathcal{X}$, \mbox{BRE} defines the hash function \wrt (with respect to) the $m$th bit for $\x\in\mathcal{X}$ as:
+\begin{align}
+h_{m}(\x) = \sgn\left(\sum\nolimits_{q=1}\nolimits^{Q}W(m,q)\kappa(\x_q,\x)\right),\nonumber
+\end{align}
+where $\W$ is an $M\times Q$ projection matrices, $\{\x_q\}_{q=1}^{Q}\subset\mathcal{X}$ are landmark points, and $\kappa(\cdot,\cdot)$ is a user specified kernel function. Note that defining hash functions this way is very common in kernel methods such as \textit{support vector machines} (\mbox{SVM}) and gives us the flexibility to work on a wide variety of data types. Therefore, given one point $\x\in\mathcal{X}$, we denote its corresponding binary representation as $\tilde{\x}$ such that its $m$th bit can be evaluated by $\tilde{x}(m) = (1+h_{m}(\x))/2$.
+
+Rather than simply choosing the $ \W $ matrix based on random hyperplanes, they construct this matrix to achieve good reconstructions. In particular, they minimize the squared error between the original distance and the reconstructed distance \wrt $ \W $ as follows,
+\begin{align}
+\mathcal{O}\left(\W\right)=\sum\nolimits_{(\x_i,\x_j)\in\mathcal{N}}\left(d(\x_i,\x_j)-\tilde{d}(\x_i,\x_j)\right)^{2},\nonumber
+\end{align}
+where $\mathcal{N}$ is a set of point pairs, $ d(\cdot,\cdot) $ is the original distance, $ \tilde{d}(\cdot,\cdot) $ is the Hamming distance. Although the problem is non-convex and hard to optimize, the authors use a heuristic coordinate-descent algorithm to find a locally optimal $ \W $. Experiments show that \mbox{BRE} achieves a state-of-the-art performance, but finding a good local optimum is hard and the performance highly depends on the applications at hand.
+
+%%%%%%%%%%%%%%%%%%%
+\subsection{Semi-Supervised Hash Function Learning}
+In semi-supervised \mbox{HFL} methods, both unlabeled and labeled data are used. Different from original unlabeled features, the labels or side-information which often carries semantic information might be very useful for hash function learning. The basic idea of semi-supervised \mbox{HFL} is to consider both kinds of information to learn the hash functions.
+
+\subsubsection{Semantic hashing}
+To learn the hash codes, semantic hashing uses multiple layers of \textit{restricted Boltzmann machines} (\mbox{RBM}), which are closely related to one popular dimensionality reduction framework based on neural networks~\cite{hinton2006science}. An \mbox{RBM} is an ensemble of binary vectors with a network of stochastic binary units arranged in two layers, one visible and one hidden. Given a layer of visible units $\v = [v_1, v_2, \dots, v_M]$, a layer of hidden units $\h=[h_1, h_2,\dots, h_N]$, and a symmetric weighting matrix $\W$ connecting units in different layers, the energy function of the joint configuration of all visible and hidden units is defined as:
+\begin{align}
+E(\v, \h) = -\sum\nolimits_{i=1}\nolimits^{M}b_{i}v_{i}-\sum\nolimits_{j=1}\nolimits^{N}b_{j}h_{j}-\sum\nolimits_{i=1}\nolimits^{M}\sum\nolimits_{j=1}\nolimits^{N}v_i h_i W(i,j),
+\end{align}
+where $v_i$ and $h_j$ are the binary states of visible and hidden units $i$ and $j$, $ W(i,j)$ are the weights and $b_i$ and $b_j$ are bias terms. Using this energy function, a probability can be assigned to a binary vector of the visible
+units:
+\begin{align}
+P(\v) =\sum\nolimits_{\h}\left(\left.e^{-E(\v,\h)}\middle/\left(\sum\nolimits_{\u,\g}e^{-E(\u,\g)}\right)\right.\right).\nonumber
+\end{align}
+
+An \mbox{RBM} lacks connections between units within a layer, hence the conditional distributions $P(\h|\v)$ and $P(\v|\h)$ have convenient forms, being products of Bernoulli distributions:
+\begin{align}
+P(h_j = 1|\v) = \sigma\left(b_j +\sum\nolimits_{i}w_{ij}v_i\right), \ \ & \ \ P(v_i = 1|\h) = \sigma\left(b_i +\sum\nolimits_{j}w_{ij}h_j\right),\nonumber
+\end{align}
+where $\sigma(x) = 1/(1 + e^{-x})$ is the logistic sigmoid function.
+
+Recently, Salakhutdinov \etal~\cite{salakhutdinov2009aistats} demonstrated methods for stacking \mbox{RBM} into multiple layers, creating ``deep networks" which can capture high order correlations between the visible units at the bottom layer of the network. By choosing an architecture that progressively reduces the number of units in each layer, a high dimensional binary input vector can be mapped to a far smaller binary vector at the output. Thus, at the output each bit maps through multiple layers of nonlinearities to model the complicated subspace of the input data. If the feature values are not binary but real numbers, the first layer of visible units are modified to have a Gaussian distribution. This type of trained networks are capable of capturing higher order correlations between different layers of the network. Since the network structure gradually reduces the number of units in each layer, the high-dimensional input can be projected to a much more compact binary vector space.
+
+A practical implementation of \mbox{RBM} has two major stages, an unsupervised pre-training stage and a supervised fine-tuning stage. The greedy pre-training stage is progressively executed layer by layer from input to output. After achieving convergence of the parameters of a layer via contrastive divergence, the derived activation probabilities are fixed and treated as input to drive the training of the next layer. During the fine-tuning stage, the labeled data is used to help refine the trained network through back-propagation. Specifically, a cost function is first defined to estimate the number of correctly classified points in the training set. Then, the network weights are refined to maximize this objective function through gradient descent. 
+
+Semantic hashing outperforms \mbox{LSH} methods in applications such as document retrieval, but it involves estimating a large number of weights. As such, it not only involves an extremely costly training procedure, but also demands sufficient labeled training data for fine-tuning.
+
+%%%%%%%%%%%%%%%%%%%
+\subsubsection{Semi-supervised hashing}
+Rather than use unlabeled and labeled data in two separate stages like semantic hashing, Wang \etal~\cite{wang2010cvpr} have developed a simple semi-supervised hashing (\mbox{SSH}) method which uses both kinds of information in a unified framework.
+
+Given a set of $N$ data points, $\X \in \mathbb{R}^{N\times D}$, and the $i$th row of $\X$ corresponds to a $D$-dimensional point that will be denoted by $\x_i$ in the sequel, the authors want to learn $M$ hash functions leading to a $M$-bit binary codes $\Y \in \{0,1\}^{N\times M}$ of $\X$. In the paper, the $m$th hash function is defined as,
+$$h_{m}(\x) = \sgn\left(\w^T_{m}\x+b_{m}\right),$$
+where $\w$ is a $D$-dimensional projection vector and $b_{m}$ is a scaler.\footnote{Note that one bit of binary code can be easily obtained by setting $y_m(\x) = \left(1+h_{m}(\x)\right)/2$.} Without loss of generality, we assume that $\X$ has zero-mean ($\sum_{i=1}^{N}\x_i=\0$),\footnote{If this is not the case, preprocessing can be applied on the data.} then the hash function can be simplified as,
+$$h_{m}(\x) = \sgn(\w^T_{m}\x).$$
+
+Based on the labels or side-information, the authors construct a set of similar point pairs $\mathcal{S}$ and a set of dissimilar pairs $\mathcal{D}$. We use $\mathcal{SD}$ to denote the set of points involved in $\mathcal{S}$ and $\mathcal{D}$,  and $\X_{\mathcal{SD}}\in \mathbb{R}^{l\times D}$ to denote its matrix form, where $l = |\mathcal{SD}|<N$.
+
+%Further, suppose there are $l$ points, $l < n$, each of which is associated with at least one of the two groups $\mathcal{S}$ or $\mathcal{D}$.
+
+In \mbox{SSH}, the hashing functions $\mathcal{H} = \{h_m\}_{m=1}^M$ can be learned by optimizing two objectives. The first objective is to maximize the empirical accuracy on $\mathcal{S}$ and $\mathcal{D}$, which is defined as the sum of difference of the total number of correctly classified pairs and that of wrongly classified pairs by each bit as follows:
+\begin{align}
+J(\mathcal{H}) = \sum\nolimits_{m=1}\nolimits^M\left(\sum\nolimits_{(\x_i,\x_j)\in\mathcal{S}}h_m(\x_i)h_m(\x_j) - \sum\nolimits_{(\x_i,\x_j)\in\mathcal{D}}h_m(\x_i)h_m(\x_j)\right).\nonumber
+\end{align}
+
+Optimizing the above objective function is difficult, since the hash functions $\{h_m\}_{m=1}^M$ are discrete and not differentiable. As such, the $\sgn(\cdot)$ operator is dropped and the following approximate objective is used instead,
+\begin{align}
+J(\W) &= \sum\nolimits_{m=1}\nolimits^M\left(\sum\nolimits_{(\x_i,\x_j)\in\mathcal{S}}\w_m^T\x_i\x_j^{T}\w_m - \sum\nolimits_{(\x_i,\x_j)\in\mathcal{D}}\w_m^T\x_i\x_j^{T}\w_m\right)\nonumber\\
+&= \frac{1}{2}\tr\left(\W^{T}\X_{\mathcal{SD}}^{T}\S\X_{\mathcal{SD}}\W\right),\nonumber
+\end{align}
+where $\W = [\w_1,\dots,\w_M] \in \mathbb{R}^{D \times M}$ and $\S\in \mathbb{R}^{l\times l}$ is a relational matrix incorporating pairwise relations,
+\begin{align}
+S(i,j) = \left\{ \begin{array}{ll}
++1 & \mbox{if } (\x_i,\x_j)\in\mathcal{S}\\
+-1 & \mbox{if } (\x_i,\x_j)\in\mathcal{D}\\
+0 & \textrm{otherwise}
+\end{array} \right..\nonumber
+\end{align}
+
+The other objective is to maximize the information conveyed by each bit of hash codes. From an information-theoretic point of view, a binary bit, which gives a balanced partition (\textit{maximal entropy partition}) of $\X$ ($\sum_{i=1}^{n}h(\x_i) = 0$), provides the maximum information. Although finding mean-thresholded hash functions that meet the balancing requirement is \mbox{NP-hard}~\cite{weiss2008nips}, it is proved that this objective is equivalent to maximizing the variance of a bit~\cite{wang2010cvpr}, which is lower-bounded by the scaled variance of the projected data. Thus the scaled variance of the projected data is used as the second objective,
+\begin{align}
+R(\W) = \rho\sum\nolimits_{k=1}\nolimits^{K}\w_m^T\X^T\X\w_m,\nonumber
+\end{align}
+where $\rho$ is a scaling parameter.
+
+Combining the two objectives into one, the optimization problem of \mbox{SSH} is formulated as follows:
+\begin{align}
+\label{eqn:ssh}
+\max_{\W} & ~\frac{1}{2}\tr\left(\W^{T}\left(\X_{\mathcal{SD}}^{T}\S\X_{\mathcal{SD}}+\rho\X^{T}\X\right)\W\right)\\
+\subto & ~\W^T\W = \I,\nonumber
+\end{align}
+where the constraint $\W^T\W = \I$ is commonly used to incorporate the uncorrelatedness of the projection directions~\cite{weiss2008nips}. Obviously, Problem~(\ref{eqn:ssh}) can be solved by spectral decomposition of the matrix $\X_{\mathcal{SD}}^{T}\S\X_{\mathcal{SD}}+\rho\X^{T}\X$ and $\W$ is actually the eigenvectors corresponding to the largest eigenvalues.
+
+Wang \etal~\cite{wang2010icml} argue that it is better to consider the dependence between contiguous bits rather than treat them independently. To this end, they propose a sequential learning algorithm which obtains one bit of codes at a time and updates the relational matrix $ \S $ before learning the next bit. Experimental studies show that the sequential algorithm achieves much better performance than semantic hashing.
+
+\subsubsection{Label-regularized max-margin partition}
+Mu \etal have taken the concept of margin into consideration to propose a semi-supervised \mbox{HFL} method termed \textit{label-regularized max-margin partition} (\mbox{LAMP})~\cite{mu2010cvpr}. Considering each hash function a binary classifier, the authors argue that larger margin between hash-induced partitions usually indicates better generalization ability to out-of-sample data.
+
+For each hash function, the optimization problem of \mbox{LAMP} is formulated as follows:
+\begin{align}
+\min_{\omega,b, \xi,\zeta,y}&~\frac{1}{2}\|\omega\|^2+\frac{\lambda_1}{N}\sum_{i}\xi_i+\frac{\lambda_2}{N}\sum_{(i,j)\in\Theta}\zeta_{ij}\nonumber\\
+\subto&~y_i(\omega^T\x_i+b)+\xi_i\ge1,\xi_i\ge0, \forall ~i,\nonumber\\
+&~y_yy_j+\zeta_{ij}\ge0,\zeta_{ij}a\ge0,\forall ~(ij)\in\Theta\nonumber,
+\end{align}
+where $ \omega $ and $ b $ are the parameters of the hash function, $ y $ is the label vector induced by the hash function, $ \Theta $ denotes the set of constraints which is generated from label or side information. Since $ y_i $ is always set to be $ \sgn(\omega^T\x_i+b) $ in hashing-based methods and $ \omega $ can be represented by a linear combination of random landmark vectors using the kernel-trick, the modified formulation of the problem is used:
+\begin{align}
+\label{SSLTH:LAMP}
+\min_{\nu,b, \xi,\zeta}&~\frac{1}{2}\nu^T\G\nu+\frac{\lambda_1}{N}\sum_{i}\xi_i+\frac{\lambda_2}{N}\sum_{(i,j)\in\Theta}\zeta_{ij}\\
+\subto&~|\nu^T\k_i+b)+\xi_i\ge1,\xi_i\ge0, \forall ~i,\nonumber\\
+&~(\nu^T\kappa_i+b)(\nu^T\kappa_j+b)+\zeta_{ij}\ge0,\zeta_{ij}a\ge0,\forall ~(ij)\in\Theta\nonumber,
+\end{align}
+where $ \G $ is a matrix computed from the random landmark vectors and $ \kappa_i $ denotes the kernel similarity between the $ i $th point and all the landmark vectors.
+
+To optimize Problem~(\ref{SSLTH:LAMP}), however, is difficult since it is non-convex and nonlinear. The authors decompose the problem using a \textit{constrained-concave-convex-procedure} (\mbox{CCCP})~\cite{yuille2001nips}, and then solve the relaxed convex sub-problems in each iteration through an efficient cutting-plane based \mbox{QP} solver.
+
+On several real data sets, \mbox{LAMP} outperforms kernelized \mbox{LSH}~\cite{kulis2009iccv} by a large margin. However, \mbox{LAMP} suffers from the local optimality issue and its performance is highly dependent on the quantity and quality of labeled pairs.
+
+\subsection{Supervised Hash Function Learning}
+In supervised \mbox{HFL} methods, only labeled data are used. There are several forms of label information, such as data labels and pairwise constraints, for example, similar pairs or dissimilar pairs.
+
+\subsubsection{Boosted similarity sensitive coding}
+\textit{Boosted similarity sensitive coding} (\mbox{BoostSSC})~\cite{shakhnarovich2003iccv,shakhnarovich2005thesis} might be, to the best of our knowledge, the first \mbox{HFL} algorithm for similarity search. Taking an embedding viewpoint, the authors propose to learn the embedding of unlabeled data into the Hamming space in which weighted Hamming distance preserves similarity information in the original input space.
+
+In their approach, they first construct two kinds of point pairs based on labels or side information. In a positive point pair $( x_i , x_j )$, $ x_j $ is one of $ N $ nearest neighbors of $ x_i $ or vice versa. In a negative pair, two points are not neighbors. After embedding or mapping, each point is represented by an $M$-bit binary vector $\y_i = [h_{1}(\x_i), h_{2}(\x_i), ..., h_{M}(\x_i)]$, and the weighted Hamming distance between two points is given by $$d(\y_i, \y_j) = \sum^{M}_{m=1}\alpha_{m}|h_{m}(\x_i)-h_{m}(\x_j)|,$$ where the weights $\alpha_{m}$'s and the functions $h_{m}$'s that map the input vector $\x_i$ into binary features are learned using Boosting~\cite{schapire1999ijcai,schapire1999mlj}.
+
+At each iteration of the learning stage, \mbox{BoostSSC} selects the parameters to minimize the following squared loss:
+\begin{align}
+\sum\nolimits_{k=1}\nolimits^{K}w(k)(z(k)-d(k))^2,\nonumber
+\end{align}
+where $ K $ is the number of training pairs, $ z(k) $ is the neighborhood label ($ z(k) = 1 $ if the points are neighbors and $ z(k) = −1 $ otherwise) of the $ k $th pair, $ w(k) $ is the weight of the $ k $th pair and $ d(k) $ is the weighted Hamming distance of the $ k $th pair computed based on current model parameters. After each iteration, \mbox{BoostSSC} increases the weights of wrongly classified pairs such that hash functions learned in the next iteration can be improved.
+
+To summarize, \mbox{BoostSSC} is simple to code, relatively fast to train and achieves competitive performance in~\cite{torralba2008cvpr}. However, \mbox{BoostSSC} might be slow to converge and become trapped in the local optimums.
+
+\subsubsection{SPEC hashing}
+
+Inspired by the idea of distribution matching in metric learning, Lin \etal~\cite{lin2010cvpr} have developed another supervised HFL method called \textit{similarity preserving entropy-based coding} (\mbox{SPEC}), for which two linear time learning algorithms exist. Given a sparse semantic similarity matrix $ \S $, the goal of \mbox{SPEC} hashing is to construct a new matrix $ \W $, which is evaluated on the Hamming distance of the learned hash codes, to minimize the KL divergence between $ \S $ and $ \W $. Each hash function is a decision stump and the hash functions are learned in an incremental manner. Since computing the objective function value is quadratic to the number of objects, the authors proposed two approximated linear time algorithms to learn the hash functions.
+
+Experimental results show that this method is better than spectral hashing. However, it is apparently unclear whether or not \mbox{SPEC} is better than its supervised or semi-supervised counterparts and whether or not its underlying assumption works well on general data sets. As such, more comparative studies are needed to validate its effectiveness.
+
+\subsubsection{Minimal loss hashing} 
+
+Norouzi \etal~\cite{norouzi2011icml} proposed a method called \textit{minimal loss hashing} (\mbox{MLH}) to learn hash functions from pairwise constraints. Intuitively speaking, \mbox{MLH} wants similar training points to be mapped onto binary codes that differ by no more than $ \rho $ bits, and dissimilar points to be mapped onto codes that differ by no less than $ \rho $ bits. The objective is represented as follows,
+\begin{align}
+\mathcal{O}(\w)  &=\sum\nolimits_{(\x_{i},\x_{j})\in\mathcal{S}}\ell_\rho(\|\y_i-\y_j\|_{H},S(i,j)),\nonumber
+\end{align}
+where $ \mathcal{S} $ is the set of point pairs, $ \y_i $ and $ \y_j $ are codes of $ \x_i $ and $ \x_j $ respectively, $ S(i,j) $ is the label of the point pair $ (\x_i, \x_j) $, and 
+\begin{align}
+\ell_{\rho}(m,s) = \left\{ \begin{array}{ll}
+\max(m-\rho+1,0) & \mbox{if } s = 1\\
+\max(\lambda\max(\rho-m+1,0)) & \mbox{if } s=0,
+\end{array} \right.\nonumber
+\end{align}
+where $ \rho $ is a user provided hyperparameter that differentiates neighbors from non-neighbors in the Hamming space, and $ \lambda $ is a loss-hyperparameter controlling the ratio of the slopes of the penalties.
+
+Though the objective is simple to understand, its formulation is discontinuous, non-convex and hence hard to optimize. To solve the optimization problem, the authors borrow the idea of structural \mbox{SVM}~\cite{tsochantaridis2004icml} and formulate a piecewise linear upper bound on the objective function. An alternating algorithm is developed to minimize the bound. Extensive experiments show that \mbox{MLH} achieves a state-of-the-art performance. However, \mbox{MLH} may still suffer from the local optimality problem.
+
+\subsection{Summary}
+
+
+Besides existing settings, some more complex \mbox{HFL} settings have also been explored recently, such as data with multiple similarities~\cite{zhang2011sigir}, data of multiple modalities~\cite{bronstein2010cvpr} and optimizing time and accuracy in a unified framework~\cite{he2011cvpr}.
+
+The major limitation of \mbox{HFL} methods is that most of them involve a training procedure with complexity $ O(N^2) $ or $ O(D^2) $, meaning that the training data should not be very large. Although some subsampling approaches can be utilized to reduce the high computational cost, developing some cheaper learning methods is a future research issue very worthwhile studying.
+
+%\chapter{Related Areas}
+%\label{chap:relatedareas}
+%In spite of being a new research topic, hash function learning is closely related to many other research topics in the areas of machine learning, data mining and computer vision. In this chapter, we briefly review two closest research areas, i.e., metric learning and active learning.
+
+ % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
+\section{Metric Learning}
+\label{background:metric}
+Metric learning is an important problem in the machine learning and pattern recognition communities. The objective is to learn an optimal metric, either linear or nonlinear, in the original feature space or the reproducing kernel Hilbert
+space, from the training data. According to whether or not the label information or side-information is used to learn the metric, existing methods can be classified into unsupervised metric learning or supervised metric learning. In the following, we briefly review some typical works in each category. For a detailed review, we refer the interested readers to~\cite{yang2006tech}.
+% the categories of 
+
+\subsection{Unsupervised Metric Learning}
+One typical case of unsupervised metric learning is linear dimensionality reduction. The most classic methods are \textit{principal component analysis} (\mbox{PCA}) and \textit{multidimensional scaling} (\mbox{MDS}). While \mbox{PCA} finds the subspace that best preserves the variance of the data, \mbox{MDS} finds the projection that best preserves the pairwise distance. The two methods are equivalent when \mbox{MDS} uses Euclidean distance. Despite being simple, efficient, and guaranteed to optimize their criteria, these linear methods could be very limited because they cannot find the nonlinear structure in the data.
+
+To reveal the nonlinear structures of data, lots of nonlinear dimensionality reduction algorithms have been proposed. \mbox{ISOMAP}~\cite{tenenbaum2000science} assumes that isometric properties should be preserved in both the observation space and the intrinsic embedding space. According to this assumption, \mbox{ISOMAP} finds the subspace that best preserves the geodesic inter-point distance. Unlike \mbox{ISOMAP} that tries to preserve the geodesic distance for any pair of data points, \textit{locally linear embedding} (\mbox{LLE})~\cite{Roweis2000science} and \textit{Laplacian Eigenmap}~\cite{belkin2003nc} focus on the preservation of the local neighbor structure. As an extension of~\cite{belkin2003nc}, \textit{locality preserving projection} (\mbox{LPP})~\cite{he2003nips} finds linear projective mappings that optimally preserve the neighborhood structure of the data. Mutual information which measures the difference between probability distributions has also been introduced to dimensionality reduction methods. Related work includes \textit{stochastic neighbor embedding} (\mbox{SNE})~\cite{hinton2002nips} and \textit{manifold charting}~\cite{brand2002nips}.
+%It is an optimal linear approximation to the eigenfunctions of the Laplace-Beltrami Operator on the manifold.
+
+\subsection{Supervised Metric Learning}
+Supervised metric learning algorithms are designed to learn either from the class labels or the side information which is often cast in the form of pairwise constraints (i.e., must-link constraints and cannot-link constraints). In~\cite{xing2002nips}, Xing \etal propose to learn a distance metric from the pairwise constraints. The optimal kernel is found to minimize the distance between data points in must-link constraints and simultaneously maximize the distance between data points in cannot-link constraints. \textit{Relevance component analysis}~\cite{shental2002eccv} is another popular approach, in which data points in the same classes are grouped in \textit{chunklets}, and the distance metric is computed based on the covariance matrix estimated from each \textit{chunklet}. Goldberger \etal~\cite{goldberger2004nips} develop an algorithm, abbreviated as \textit{neighborhood component analysis}, which combines metric learning with $k$-nearest neighbor (KNN) classification. Globerson \etal~\cite{globerson2005nips} present an algorithm to collapse data samples in the same class into a single point and make samples belonging to different classes far apart. Recently, an information-theoretic based approach~\cite{davis2007icml} developed by Davis \etal has been reported to achieve a state-of-the-art performance.
+
+Empirical studies show that supervised metric learning algorithms usually outperform the unsupervised ones. However, most of the supervised metric learning algorithms need to solve non-trivial optimization problems, and thus are computationally expensive.
+
+%particularly when the data are in large-scale and with high dimensionality.
+
+
+\subsection{Relationship with \mbox{HFL}}
+Both metric learning and hash function learning try to learn a proper metric from data, but they are different in several aspects. First of all, the learned metric in hash function learning is Hamming distance while that of metric learning is usually the Euclidean distance. Secondly, hash function learning maps data into binary codes whereas metric learning often maps data into real vectors. Last but not least, hash function learning and metric learning have quite different applications. Hash function learning aims to speed up approximate similarity search, but metric learning is usually applied to classification and recognition applications. Therefore, hash function learning puts more focus on local similarity than conventional metric learning.
+
+%have quite different goals. Metric learning aims to learn a similarity metric while is the most propose for tasks at hand, while hash function learning targets at learn hash functions that can generate compact binary codes for similarity search. They are related since both of them defines a metric finally.
+
+ % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
+\section{Active Learning}
+\label{background:active}
+As a research topic originally developed by the machine learning community, active learning has been widely applied in many areas such as computer vision, data mining and information retrieval. The task of active learning is to select the most informative data for experts to label with the goal of reducing the labeling cost, which might be expensive in many tasks. Over the past few decades, a lot of algorithms have been proposed and gained great successes. 
+
+The major challenge of active learning is how to find the most informative data for specific applications effectively and efficiently. In the following, we briefly review some general criteria of data informativeness and corresponding well-known algorithms. The readers are encouraged to read~\cite{Settles2009survey,tong2001thesis} for detailed reviews. Please also note that we use instance, example and data interchangeably in the sequel.
+
+\subsection{Uncertainty-based Active Learning}
+
+Perhaps the simplest and the most commonly used approach is \textit{uncertainty-based active learning} (\mbox{UAL})~\cite{lewis1994icml,Lewis1994sigir}. In this approach, the learner selects the instances whose labels it is the most uncertain about for the experts to label. This method is very straightforward for classifiers with probabilistic outputs. Take binary classification problems for example, when the basic learner could predict the labels in a probabilistic way, such as $P(y=+1\mid \x)=0.8$, \mbox{UAL} will select the instance whose posterior probability of being positive (or negative) is nearest to $0.5$. However, this simple method will not be suitable in settings where there are more than two classes. A more general \mbox{UAL} method selects the data points maximizing the \textit{entropy} defined as follows:
+$$\x^*=\argmax\nolimits_{\x} H(\y\mid\x)=\argmax\nolimits_{\x} \left( -\sum\nolimits_i P(y_i\mid \x,\theta)\log P(y_i\mid \x,\theta)\right),$$
+where $H(\y\mid\x)=-\sum_i P(y_i\mid \x,\theta)\log P(y_i\mid \x,\theta)$ is called entropy which measures the uncertainty of label $\y$ given instance $\x$, $y_i$ ranges over all possible labels and $\theta$ is the model parameter. The criterion of entropy can be easily generalized to probabilistic models for more complex structured instances, such as sequences~\cite{Settles2008emnlp} and trees~\cite{Hwa2004CL}.
+
+An alternative to entropy-based \mbox{UAL} is selecting the instance whose \textit{most probable} label is the \textit{least confident}, which can be formulated as follows:
+$$\x^* = \argmin\nolimits_{\x} P(y^*\mid \x,\theta),$$
+where $y^* = \argmax_{y}P(y\mid \x, \theta)$ is the most probable class label of instance $\x$. This method has been shown to work especially well for information extraction tasks~\cite{Culotta2005aaai,Settles2008emnlp}.
+
+For classifiers without probabilistic outputs, \mbox{UAL} can also be applied if the outputs could be mapped to probabilities~\cite{Lindenbaum2004mlj,Fujii1998CL}. Take margin-based classifiers such as \mbox{SVM} for example, the certainty can be defined as the distance to the decision boundary~\cite{Tong2002jmlr}.
+
+Another general \mbox{UAL} method is \textit{query-by-committee} (\mbox{QBC})~\cite{Seung1992colt}. This approach maintains a group of classifiers, called a \textit{committee}, which are trained on the current labeled data. Each committee member represents one classifier, and is allowed to vote on any unlabeled instances. The most uncertain data are those whose labels the committee members have the largest disagreement on. Intuitively, the \mbox{QBC} strategy is to minimize the version space represented by the committee of classifiers.
+
+The \mbox{UAL} approaches are not immune to selecting outliers, which have high uncertainty but are not helpful to the learner when labeled and incorporated into the training set. Examples are provided in~\cite{McCallum1998icml}.
+
+\subsection{Representativeness-based Active Learning}
+Although effective and easy to implement in many applications, \mbox{UAL} methods are always prone to querying outliers, which are useless, sometimes even harmful, for classifier training. To overcome this limitation, \textit{representativeness-based active learning} (\mbox{RAL}) has been proposed. The intuition of \mbox{RAL} methods is that the most informative data should be the most representative of the unlabeled data.
+
+Xu \etal~\cite{Xu2003ecir} might be the first to implement the above intuition for \mbox{SVM} classifiers, using some simple heuristics. Instead of selecting the instances closest to the current \mbox{SVM} hyperplane, they first cluster the points in the margin of the current model and then query the labels of the cluster centroid. ~\cite{Nguyen2004icml} first clusters unlabeled instances and tries to avoid querying outliers by propagating label information from cluster centroid to instances in the same cluster. 
+
+Density-based active learning algorithms, which tend to select the instances from dense regions, could also be considered a special case of \mbox{RAL}, because the denser the region is, the more representative the instances (located in the region) are. These \mbox{RAL} approaches are always used in combination with \mbox{UAL} methods~\cite{Xu2007ecir,Settles2008emnlp}. In \cite{Xu2007ecir}, data informativeness is measured by relevance, density and diversity in the relevance feedback tasks. Similarly,~\cite{Settles2008emnlp} develops an information density framework for the sequence labeling task to measure the uncertainty and representativeness of instances.
+
+In recent years, experimental design originated in statistics has been introduced as a new family of \mbox{RAL} methods. The seminal work is \textit{transductive experimental design}~\cite{Yu2006icml}, which extends traditional experimental design methods to the transductive setting for active learning. Some subsequent work includes convex relaxation of the original problem~\cite{Yu2008sigir}, and incorporation of \textit{Laplacian} regularization~\cite{he2007sigir} or label information~\cite{zhen2010sigir}.
+
+
+\subsection{Minimal Loss Active Learning}
+
+In many real-world applications, the learned classifiers are eventually evaluated on a test set, so a better classifier should make less error on the test set. However, none of previous approaches directly optimize this objective, and this may explain why they do not work well in some circumstances. Intuitively, \textit{minimal loss active learning} (\mbox{MLAL}) aims to select the instances, when labeled and incorporated into the training set, leading to the largest error reduction on the test set. To evaluate the test error, we have to know the true labels of test instances. However, the true labels are unknown during the model training phase, as a result, the estimated (or expected) test error is used.
+
+Cohn \etal proposed a statistically optimal solution, which selects the training examples that result in the lowest error on future test examples~\cite{cohn1996jair}. In their analysis, this goal could be achieved by minimizing the variance of training data. The authors developed two simple algorithms with closed form solutions for regression problems. For classification problems, Roy and McCallum used a sampling approach to estimate the expected error reduction~\cite{Roy2001icml}. Later, this framework was combined with a supervised learning approach to give a dramatic improvement over conventional \mbox{UAL} methods~\cite{Zhu2003icmlws}.
+
+\mbox{MLAL} has the advantages of being near-optimal and independent of the types of classifiers. However, it may be the most prohibitively expensive strategy, because it requires not only estimating the expected future error over the unlabeled data at each learning iteration, but also retraining the classifier for each possible label of the instance. To reduce the computational cost, some researchers have resorted to subsampling the unlabeled data~\cite{Roy2001icml} or approximate training techniques~\cite{guo2007ijcai}.
+
+\subsection{Relationship with \mbox{HFL}}
+Active learning and active hashing have in common that both of them aim to find the most informative data for experts to label. As such, the criteria of informativeness might be similar in active learning and active hashing. However, active learning is usually applied to classification, regression and ranking problems, which are very different from the approximate similarity search to which active hashing applies. This may lead to big differences in the definitions of informativeness, the formulations of optimization problems as well as the algorithms.
+
+\section{Summary}
+\label{background:sum}
+In this chapter, we have reviewed hashing-based methods for similarity search, and two machine learning areas related to hash function learning. The central idea of hashing-based methods is to index data using binary codes which have the advantages of highly reduced storage cost and very fast computation speed. Different from locality sensitive hashing which is based on random projections or permutations, hash function learning aims to learn hash functions from data automatically, and thus, as we see later in more detail, has a close relationship with metric learning and active learning.
+
+In the next chapter, we introduce the framework of active hashing which combines the concepts behind semi-supervised hash function learning and active learning to make \mbox{HFL} more cost effective.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%\subsection{Hashing for Compression}
+%
+%Besides speeding up nearest neighbor search, hashing-based methods has also been applied to data compression, which is of essential importance in many large-scale problems.
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%\subsubsection{Hash Kernel}
+%
+%%Shi \etal~\cite{shi2010cvpr} use hash functions to speed up face recognition.
+%
+%Shi \etal~\cite{shi2009aistats,weinberger2009icml} firstly introduce hashing into vector compression. The major idea is to hash variables (\aka features) into a small number of bins such that linear kernels computed on the old and new feature spaces are guaranteed to be very close to each other .
+%
+%Given a feature mapping function $\phi(\x)$ and a hash function $h:\mathcal{J}\rightarrow \{1,\dots,M\}$, where $\mathcal{J}$ is the index set of feature dimension, a hash kernel can be defined as,
+%\begin{align}
+%\bar{k}(\x,\x') = \langle\bar{\phi}(\x),\bar{\phi}(\x')\rangle,
+%\end{align}
+%where $\bar{\phi}_{j}(\x) = \sum_{i\in\mathcal{J};h(i)=j}\phi_{i}(\x)$.
+%
+%The expectation of hash kernel is
+%\begin{align}
+%\mathbb{E}_{h}[\bar{k}^{h}(\x,\x')] = (1-\frac{1}{N})k(\x,\x')+\frac{1}{N}\sum_{i,i'}\phi_{i}(\x)\phi_{i}(\x').\nonumber
+%\end{align}
+%And the variance of every entry of hash kernel is upper bounded by $O(\frac{1}{N})$.
+%
+%
+%\begin{theorem}
+%Assume that the probability of deviation between the hash kernel and its expected value is bounded by an exponential inequality via
+%\begin{align}
+%p\left(|\bar{k}^{h}(\x,\x') - \mathbb{E}_{h}[\bar{k}^{h}(\x,\x')]|>\epsilon\right)\le c \exp(-c'\epsilon^2 n),\nonumber
+%\end{align}
+%for some constants $c,c'$ depending on the size of the hash and the kernel used. In this case the error $\epsilon$ arising from ensuring the above inequality for $m$ observations and $M$ classes (for a joint
+%feature map $\phi(x, y)$ is bounded by (with $c'' = -\log c - 2\log 2$)
+%\begin{align}
+%\epsilon\le\sqrt{(2\log(m+1)+2\log(M+1)-\log\delta-c'')/c'}.\nonumber
+%\end{align}
+%\end{theorem}
+%
+%Since above hash kernels are biased, an unbiased hash kernel has been proposed~\cite{weinberger2009icml} and defined as follows,
+%\begin{align}
+%\bar{\phi}_{j}(\x) = \sum_{i\in\mathcal{J};h(i)=j}\phi_{i}(\x)\xi(i),\nonumber
+%\end{align}
+%where $\xi$ is a hash function with image range $\{\pm1\}$.
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%\subsubsection{HashCoFi}
+%In previous section, we have introduced an approach to compress vectors, while in this section, we introduce a similar method that compress matrices.
+%
+%In matrix factorization, which has been proved to be a powerful tool for collaborative filtering, the observations are viewed as a sparse matrix $\Y$ where $Y_{ij}$ indicates the rating user $i$ gave to item $j$. Matrix factorization approaches then
+%approximate this matrix $\Y$ with a dense matrix $\F$ and this
+%approximation is modeled as a matrix product between
+%a matrix $\U\in\mathbb{R}^{N\times D}$ of user factors and a matrix $\V\in\mathbb{R}^{M\times D}$ of item factors so that $\F = \U\V^T$.
+%
+%One of the key challenges is that storing $\U$ and $\V$ quickly becomes infeasible for increasing $N,M,D$. Thus we would like to find approximated compressed representations of $\U$ and $\V$ in the form of vectors $\u$ and $\v$ respectively.
+%
+%Let $h,h'$ denote two independent hash
+%functions with range $\{1,\dots, N\}$ where $N$ denotes
+%the size of hash table. Moreover, denote by $\sigma,\sigma'$ two independent Rademacher functions with range $\{\pm1\}$ with expected value 0 for any argument.
+%
+%The compressed representation $\u$ and $\v$ can be constructed as follows,
+%\begin{align}
+%u_i&= \sum_{(j,k):h(j,k)=i}U_{jk}\sigma(j,k),\nonumber\\
+%v_i&= \sum_{(j,k):h'(j,k)=i}V_{jk}\sigma'(j,k)\nonumber.
+%\end{align}
+%In another word, the entries in $\U$ and $\V$ are added randomly into $\u$ and $\v$ respectively. The basic assumption of this scheme is that only a small number of matrix entries are significant. We reconstruct $\U$ and $\V$ via
+%\begin{align}
+%\tilde{U}_{ij} = u_{h(i,j)}\sigma(i,j),\tilde{V}_{ij} = v_{h'(i,j)}\sigma'(i,j).\nonumber
+%\end{align}
+%As a result,
+%\begin{align}
+%\tilde{F}_{ik} = \sum_{j=1}^{D}u_{h(i,j)}v_{h'(k,j)}\sigma(i,j)\sigma'(k,j).\nonumber
+%\end{align}
+%
+%It can be proved that the reconstructed $\U,\V,\F$ are in expectation accurate and the variance of $\F$ is upper bounded by $O(\frac{1}{N})$. The expectation and variance are \wrt $\sigma,\sigma'$.
+%
+%Since it could be inefficient to store $\u$ and $\v$ separately, a joint compression scheme is proposed,
+%\begin{align}
+%w_i = \sum_{(a,b):h(a,b)=i}U_{ab}\sigma(a,b)+\sum_{(a,b):h'(a,b)=i}V_{ab}\sigma'(a,b)\nonumber,
+%\end{align}
+%and the reconstruction is,
+%\begin{align}
+%\tilde{U}_{ij} &= w_{h(i,j)}\sigma(i,j)\nonumber\\
+%\tilde{V}_{ij} &= w_{h'(i,j)}\sigma'(i,j).\nonumber
+%\end{align}
+%
+%The expectation of $\tilde{F}_{ij}$ has a small correction term and its variance still upper bounded by $O(\frac{1}{N})$.
+%
+%Given the hash functions, we can learn $\w$ using stochastic gradient descent method.
+%
+%The advantages of HashCoFi are:
+%\begin{itemize}
+%  \item Scales up to very large collaborative filtering problems, since the storage only depends on memory constraints.
+%  \item The compression of factors is very effective when memory is very limited
+%\end{itemize}
+%
+%The disadvantages of HashCoFi:
+%\begin{itemize}
+%  \item The hash functions, i.e., h, h¡¯, are data-independent, hence N could still be very large
+%  \item Computational cost becomes larger due to the use of hashing
+%  \item Performs worse than MF models when their D is large, with same memory constraints
+%      \item Needs a number of repeats of sigma, sigma¡¯, to achieve good estimation
+%\end{itemize}
+%
+

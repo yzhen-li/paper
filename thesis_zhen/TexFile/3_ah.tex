@@ -1,0 +1,603 @@
+
+\chapter{Active Hashing}
+\label{chap:ah}
+
+ % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
+\section{Introduction}
+
+Existing supervised and semi-supervised \mbox{HFL} methods can be considered \textit{passive hashing} because they assume that the labeled data are provided beforehand. However, given the labeled data may be expensive to acquire,\footnote{Although crowdsourcing has recently been developed to acquire labels in a very cheap manner, for some domains involving privacy or confidentiality, it is inappropriate to involve the ``crowd" in the labeling work.} it is more cost effective if we are able to identify and label the most informative data. In this case, hash functions can be learned efficiently with only a small number of labeled data and the labeling cost, which might be very high in practice, can be greatly reduced. Besides, as we will see in next subsection, the effectiveness of the labeled data may be quite different. In some situations, adding more labels (if not carefully chosen) into the training set may even impair the quality of the learned hash functions. As a result, it is a very worthwhile endeavor to explore methods of selecting and labeling data in an active manner for hash function learning.
+
+To eliminate the aforementioned limitations of passive hashing, in this chapter, we propose a novel framework, called \textit{active hashing} (\mbox{AH}), with the goal of selecting the most informative data to label for hash function learning.\footnote{Active hashing and active learning~\cite{Angluin1988mlj,cohn1994mlj} have quite different goals, although they share some common ideas such as selecting the most informative data for expert to label.} Generally speaking, each active hashing iteration consists of three phases as depicted in Figure~\ref{fig:ah:ah}. Specifically, given the labeled data set $\mathcal{L}$, the unlabeled data set $\mathcal{U}$ and the candidate data set $\mathcal{C}$,
+\begin{itemize}
+  \item Active selection phase: select the most informative data points from $\mathcal{C}$ to form set $\mathcal{A}$ .
+  \item Labeling phase: ask an oracle to label the points in $\mathcal{A}$ and update  $\mathcal{L}$,  $\mathcal{U}$ and  $\mathcal{C}$.
+  \item Training phase: Train hash functions based on both $\mathcal{L}$\footnote{The usage of $\mathcal{L}$ may be different in different methods. For example, \mbox{SSH} can construct labeled pairs $\mathcal{S}$ and $\mathcal{D}$  easily from $\mathcal{L}$.} and $\mathcal{U}$.
+\end{itemize}
+
+\begin{figure}[htb]
+\centering
+%\vspace{-0.5cm}
+\epsfig{figure=fig/activehashing.pdf, width=0.5\textwidth}
+%\vspace{-2cm}
+\caption{Three phases of one active hashing iteration. Each iteration starts from the active selection phase and ends by the training phase.}
+\label{fig:ah:ah}
+\end{figure}
+
+
+
+In practice, there can be several iterations before some criteria are met. For example, we have run out of labeling resources or the quality of the learned hash functions is satisfactory.
+
+%Under this framework, we have developed a simple method based on the uncertainty criterion.
+
+The remainder of this chapter is organized as follows. Section~\ref{AH:motivation} illustrates the limitations of passive hashing to motivate our active hashing framework. In Section~\ref{AH:UAH}, we present a simple active hashing method based on the uncertainty criterion. Empirical studies conducted on several real-world data sets are presented in Section~\ref{AH:exps}, followed by some conclusions in Section~\ref{AH:conclusion}.
+
+%In Section~\ref{AH:ITAH}, we present an information theoretic method which select labeled data by maximizing the information gain.
+%\section{Related Work}
+%\label{section:relatework}
+%
+%The most well-known hashing-based method is probably locality sensitive hashing (\mbox{LSH})~\cite{andoni2006focs}. \mbox{LSH} simply applies random linear projection followed by thresholding to index data points, with the goal of assigning similar binary codes to data points that are close in the feature space.  An appealing property of LSH is the existence of theoretical guarantee that, as the code length increases, the Hamming distance between two codes will asymptotically approach the metric distance. However, \mbox{LSH} may lead to quite inefficient (long) codes in practice due to its data-independent nature.
+%
+%Machine learning techniques have recently been introduced to learn data-dependent hash functions which are superior to data-independent ones.  In semantic hashing~\cite{salakhutdinov2009ijar}, a stacked Restricted \mbox{Boltzmann} Machine (\mbox{RBM}) is used to generate compact binary codes for document retrieval. In boosted similarity sensitive coding~\cite{shakhnarovich2005thesis}, the boosting approach is incorporated to learn the codes. These two methods have been demonstrated to be much more effective than \mbox{LSH} for similarity search in a large image database containing millions of pictures~\cite{torralba2008cvpr}. Spectral hashing (\mbox{SH})~\cite{weiss2008nips} treats the hashing problem as a spectral embedding problem and makes use of spectral decomposition to obtain binary codes. Although good performance has been shown when applying \mbox{SH} on some data sets, it makes a restrictive and unrealistic assumption that data are uniformly distributed in a hyper-rectangle.  This restrictive assumption does not hold in general.  To relax this assumption, some new methods have been proposed, such as self-taught hashing~\cite{zhang2010sigir}, binary reconstructive embedding~\cite{kulis2009nips} and distribution matching~\cite{lin2010cvpr}. Besides, several researchers have developed more general hashing methods that can support kernels~\cite{kulis2009iccv,he2010kdd,mu2010cvpr}, non-metric data~\cite{mu2010aaai} and multimodal data~\cite{bronstein2010cvpr}.
+%
+%As expected, our work is also related to \emph{active learning}~\cite{Angluin1988mlj,cohn1994mlj,Lewis1994sigir,MacKay1992ncj}.  As a topic in machine learning, active learning seeks to reduce the labeling cost by identifying and presenting the most informative examples from the unlabeled data for the human experts to label. Hence the key issue is how to measure data informativeness. Many criteria have been proposed for this. Taking classification problems for example, some methods select the most uncertain data given the current classifier~\cite{Lewis1994sigir}, some select the data with the smallest margin~\cite{Tong2002jmlr}, some select the data on which multiple classifiers disagree most with each other~\cite{Freund2003jmlr,McCallum1998icml,Seung1992colt}, some select the data that optimize some information gain~\cite{guo2007ijcai,MacKay1992ncj,Roy2001icml,Zhu2003icmlws}, and some select data points which are the most representative given the data distribution~\cite{Nguyen2004icml,Yu2006icml}. 
+%
+%Another hot research issue in active learning is batch mode active learning~\cite{hoi2006www,hoi2006icml,Guo2007nips} which aims at selecting a set of points rather than one point at a time. Batch mode active learning can save much computational cost and thus is very suitable for large-scale and parallel computing applications. More recently, experimental design techniques~\cite{atkinson1992book} in statistics have been introduced to active learning and have achieved state-of-the-art performance in active learning  applications~\cite{Yu2006icml,he2007sigir,Yu2008sigir,zhen2010sigir}.
+\section{Motivation}
+\label{AH:motivation}
+
+%\subsubsection{Limitations of Passive Hashing}
+%\label{section:motivation}
+In passive hashing methods such as \mbox{SSH}, there are two types of point pairs (similar and dissimilar) and both types are considered equally important. However, as illustrated in Fig.~\ref{fig:bias} below, treating both types of point pairs as equally important is not satisfactory when the data points belong to more than two classes.
+
+%\vspace{-1cm}
+\begin{figure}[htb]
+\centering
+\epsfig{figure=fig/ah/bias, width=0.7\textwidth}
+\caption{Limitations of passive hashing}
+\label{fig:bias}
+\end{figure}
+
+In Fig.~\ref{fig:bias}, we use circles, triangles, hexagons and smaller circles to denote labeled data of three different classes and unlabeled data respectively. There are two dissimilar pairs represented by a blue dashed line and a green dashed line. Obviously, the circle class is more similar (closer) to the hexagon class than the triangle class.  However, the two pairs induce the same weight ($-1$) in $\mathcal{D}$, making the learned hash functions biased and perform worse even when more labeled pairs are provided. As a result, it is very important to treat the pairs with different weights or informativeness, as we will discuss later, but passive hashing methods are unable to do so. 
+
+
+To see some real examples of these limitations, we conduct a group of experiments on the \mbox{MNIST} data set.\footnote{Details of the data set and the evaluation methods will be introduced later.} In the experiments, we trained several semi-supervised hashing models~\cite{wang2010cvpr} by varying the number of labeled points\footnote{All the pairwise relations among these points will be used for training.}. The performance of these models, measured by average precision and recall over ten random repeats, is plotted in Fig.~\ref{fig:ah:demo-randompoint} below.
+
+\begin{figure}[ht]
+\vspace{-1.5cm}
+\subfigure[Precision]{
+    \begin{minipage}[b]{0.48\linewidth}
+%        \centering
+        \epsfig{figure=fig/activepoint-largemnist-precision500-24b-bias, width=1.0\textwidth}\vspace{-2cm}
+    \end{minipage}}
+\subfigure[Recall]{
+    \begin{minipage}[b]{0.48\linewidth}
+%        \centering
+        \epsfig{figure=fig/activepoint-largemnist-recall500-24b-bias, width=1.0\textwidth}\vspace{-2cm}
+    \end{minipage}}
+\caption{Semi-supervised hashing with a varying number of labeled data points}
+\label{fig:ah:demo-randompoint} %% label for entire figure
+\end{figure}
+
+We can see that the model performance in terms of both precision and recall has big variance, showing that the effectiveness of labeled points is quite different. Moreover, the model performance improves as the number of labeled data points increases until about one thousand. After that, however, the performance degrades as more labeled points are added, indicating that choosing labeled data is very critical to supervised and semi-supervised \mbox{HFL} algorithms. 
+
+The motivation of active hashing is simple: if we select labeled data carefully, we can not only reduce the model variance but also keep improving the model quality without impairing it when more labeled data are added into the training set.
+
+\section{Uncertainty-based Active Hashing}
+\label{AH:UAH}
+
+
+
+
+%In the first group of experiments, we randomly select $1,000$ data points and vary the number of observed pairwise relations among these points from $ 10^2 $ to $ 10^6 $. The selection of pairwise relations is repeated ten times and the average results are plotted in Fig.~\ref{fig:ah:demo-fixpoint}. Obviously, given that the data points are fixed, the larger the number of observed pairwise relations, the better performance the model achieves. But the variance is small, meaning that if we select a fixed number of pairwise relations among these points, different random selections make little difference.
+%
+%\begin{figure}[ht]
+%\vspace{-2cm}
+%\subfigure[Precision]{
+%    \begin{minipage}[b]{0.48\linewidth}
+%        \centering
+%        \epsfig{figure=fig/demo-fixpoint-precision-8b, width=1.0\textwidth}\vspace{-2.5cm}
+%    \end{minipage}}
+%\subfigure[Recall]{
+%    \begin{minipage}[b]{0.48\linewidth}
+%        \centering
+%        \epsfig{figure=fig/demo-fixpoint-recall-8b, width=1.0\textwidth}\vspace{-2.5cm}
+%    \end{minipage}}
+%\caption{Semi-supervised hashing with a varying number of labeled pairs}
+%\label{fig:ah:demo-fixpoint} %% label for entire figure
+%\end{figure}
+
+%From above experiments, we see previous passive hashing methods suffer from aforementioned limitation, in the following, we present our solution which can overcome this limitation.
+
+\subsection{Uncertainty-based Active Hashing}
+The challenge of active hashing is how to identify the most informative points for hash function learning. Based on a previous semi-supervised \mbox{HFL} model, i.e., \mbox{SSH}~\cite{wang2010cvpr}, we propose an \textit{uncertainty-based active hashing} (\mbox{UAH}) method.
+
+We have already known that, in~\cite{wang2010cvpr}, one bit code is obtained by thresholding a linear projection of a point $\x$, e.g., $h_m = \sgn(\w_m^T\x)$ for the $m$th bit. Intuitively speaking, the magnitude of $\w_m^T\x$ measures the certainty of current hash function $h_m$ on the $m$th bit code of $\x$. In other words, the larger $|\w_m^T\x|$ is, the more certain $h_m$ is on $\x$, and vice versa. Thus it is very straightforward to use $h_m$'s certainty $\bar{h}_m(\x) = |\w^T_m\x|$ to measure the informativeness of point $\x$; that is, the smaller $\bar{h_m}(\x)$ is, the less certain $h_m$ is on $\x$ and hence the more informative $\x$ is to $h_m$. Therefore, given a group of $M$ hash functions $\mathcal{H} =\{h_m\}_{m=1}^M$, we define the certainty of $\x$ \wrt $\mathcal{H}$ as follows,
+\begin{mydef} Data Certainty
+  \label{definition:certainty}
+   \begin{align}
+   f(\mathcal{H},\x) = \|\W^T\x\|_{2},\nonumber
+    \end{align}
+    where $\|\cdot\|_{2}$ denotes the vector $\ell_2$ norm.\footnote{Please note that other norms such as $\ell_1$ norm can also be used to define certainty.}
+\end{mydef}
+
+Based on this simple definition of informativeness, one simple active hashing algorithm is to select the point with the smallest $f$ value at each active iteration. However, as pointed out by~\cite{hoi2006www,Guo2007nips}, selecting data point in such a greedy manner, i.e., one at a time, could be very inefficient in practice. Moreover, greedy selection may be suboptimal because the selected points might be very similar to each other and hence provide redundant information to the learner. As such, we propose a \textit{batch mode active hashing} (\mbox{BUAH}) algorithm which can select a batch of points at a time.
+
+
+Similar to the batch mode active learning algorithm for image classification studied in~\cite{hoi2006icml}, we define the objective of \mbox{BUAH} as follows,
+\begin{eqnarray}
+\label{equation:ah}
+\min_{\muu}&\muu^T\tilde{\f}+\frac{\lambda}{M}\muu^T\K\muu\\
+\subto& \muu\in \{0,1\}^{|\mathcal{C}|}, \muu^T\1=M,\nonumber
+\end{eqnarray}
+where $\tilde{\f}$ is the normalized certainty value of the points in a candidate set $\mathcal{C}$ and can be computed as $\tilde{f}_i = f(\mathcal{H},\x_i)/f_{\max}$ and $ f_{\max} = \max_{\x_i\in\mathcal{C}} f(\mathcal{H},\x_i)$, $\muu$ is an indicator vector whose entries control whether or not corresponding points are selected, i.e., $\mu_i = 1$ when $\x_i$ is selected and $\mu_i = 0$ when $\x_i$ is not selected. We call $\lambda$ the balancing parameter, since it controls the balance between the two terms. Moreover, $K$ is the number of points we want to select and $\K$ is a positive semi-definite similarity matrix defined on $\mathcal{C}$. We use cosine similarity in our experiments, however, using other similarities is also possible and we leave it as future work.
+
+Intuitively, we can consider the first term of Eqn.~(\ref{equation:ah}), $\muu^T\tilde{\f}$, to be the sum of certainty of selected examples, and the second term, $\muu^T\K\muu$, to be the sum of similarity between these selected examples. Thus minimizing the objective of Problem~(\ref{equation:ah}) is to select a set of points that are the most uncertain and dissimilar with each other. However, Problem~(\ref{equation:ah}) is an integer programming problem and NP-hard. We relax the problem by replacing the integer constraint $\muu\in \{0,1\}^{|\mathcal{C}|}$ with continuous constraint $\0\le\muu\le\1$, and arrive at the following optimization problem,
+ \begin{eqnarray}
+ \label{equation:ah:relax}
+\min_{\muu}&\muu^T\tilde{\f}+\frac{\lambda}{M}\muu^T\K\muu\\
+ \subto& \0\le\muu\le\1,\muu^T\1=M.\nonumber
+ \end{eqnarray}
+The optimization problem~(\ref{equation:ah:relax}) is a standard \mbox{QP} problem that can be solved efficiently using existing solvers~\cite{boyd2004convex}. Finally, given the estimated $\muu$, we select $M$ unlabeled points with the largest $\mu_i$'s.
+
+The algorithm of \mbox{BUAH} is summarized in Algorithm~\ref{algorithm:ah}, where the superscripts of $\mathcal{L}, \mathcal{U}, \mathcal{C}$ indicate the indices of active selection iterations and $T$ is the total number of iterations. Since solving Problem~(\ref{equation:ah:relax}) requires time complexity $O(|\mathcal{C}|^3)$, in practice, we can select a subset of $\mathcal{C}$ corresponding to the smallest $f_i$ values to reduce the computational cost without much loss of accuracy.
+
+%\begin{algorithm}
+%%\DontPrintSemicolon
+%%\SetKwData{Left}{left}\SetKwData{This}{this}\SetKwData{Up}{up}
+%%\SetKwFunction{Union}{Union}\SetKwFunction{FindCompress}{FindCompress}
+%\SetKwInOut{Input}{Input}\SetKwInOut{Output}{Output}
+%\Input{$\mathcal{L}^{0},\mathcal{U}^{0},\mathcal{C}^{0}, T$}
+%\Output{$\mathcal{L}^{T}, \mathcal{C}^{T}$}
+%\Begin{
+%\For{$t=1$ to $T$}{
+%Train hash functions $\mathcal{H}$ based on $\mathcal{L}^{t-1}$ and $\mathcal{U}^{t-1}$\;
+%Compute certainty value $\f$ of $\mathcal{C}^{t-1}$ using Definition~\ref{definition:certainty}\;
+%Solve Problem~(\ref{equation:ah:relax}) and obtain $\muu$\;
+%Choose $M$ examples with the largest $\mu_i$ into $\mathcal{A}^{t}$\;
+%Request the labels of points in $\mathcal{A}^{t}$\;
+%Update $\mathcal{L}^{t}\leftarrow\mathcal{L}^{t-1}\cup\mathcal{A}^{t}$, $\mathcal{U}^{t}\leftarrow\mathcal{U}^{t-1}\setminus \mathcal{A}^{t}$ and $\mathcal{C}^{t}\leftarrow\mathcal{C}^{t-1}\setminus \mathcal{A}^{t}$\;  }
+%}
+%\caption{Algorithm of \mbox{BUAH}}
+%\label{algorithm:ah}
+%\end{algorithm}
+
+\begin{algorithm}[tb]
+   \caption{Algorithm of \mbox{BUAH}}
+   \label{algorithm:ah}
+\begin{algorithmic}
+   \STATE {\bfseries Input:} \\
+   $\mathcal{L}^{0}$ -- initial set of labeled data,\\
+   $\mathcal{U}^{0}$ -- initial set of unlabeled data,\\
+   $\mathcal{C}^{0}$ -- initial set of candidate data,\\
+    $T$ -- number of iterations
+	\STATE {\bfseries Procedure:}
+%   \STATE Initialize $noChange = true$.
+\FOR{$t=1$ {\bfseries to} $T$}
+\STATE Train hash functions $\mathcal{H}$ based on $\mathcal{L}^{t-1}$ and $\mathcal{U}^{t-1}$\;
+\STATE Compute certainty value $\f$ of $\mathcal{C}^{t-1}$ using Definition~\ref{definition:certainty}\;
+\STATE Solve Problem~(\ref{equation:ah:relax}) and obtain $\muu$\;
+\STATE Choose $M$ examples with the largest $\mu_i$ into $\mathcal{A}^{t}$\;
+\STATE Request the labels of points in $\mathcal{A}^{t}$\;
+\STATE Update $\mathcal{L}^{t}\leftarrow\mathcal{L}^{t-1}\cup\mathcal{A}^{t}$, $\mathcal{U}^{t}\leftarrow\mathcal{U}^{t-1}\setminus \mathcal{A}^{t}$ and $\mathcal{C}^{t}\leftarrow\mathcal{C}^{t-1}\setminus \mathcal{A}^{t}$\;
+\ENDFOR
+%
+\end{algorithmic}
+\end{algorithm}
+
+ % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
+%\section{Optimistic Active Hashing}
+%\label{AH:LAH}
+%
+%We want to formulate the active sampling problem as a optimization problem, whose objective is the expected reduction of some loss.
+
+ % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
+%\section{Information-theoretic active hashing}
+%\label{AH:ITAH}
+%
+%We require the sampler to select those points maximizing some information gain \wrt a hashing model. This approach should also be applied to other hashing models if the selected points are really informative to hash function learning. You can read the information theoretic active learning again.
+
+ % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
+\section{Experiments}
+\label{AH:exps}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Experimental Settings}
+
+We conduct several experiments on two tasks, namely, image retrieval and text retrieval. For both tasks, we mean-center the data and normalize the feature vectors to have unit norm. Both data sets are partitioned into separate training and test sets.  We first use the training set to learn hash functions. Then we retrieve from the training set 500 points with smallest Hamming distances to the query point in the test set. Two evaluation measures, precision and recall, of the retrieved points are computed for each query and then averaged over all the queries. In all the experiments, we set the size of the candidate set $|\mathcal{C}| = 5000$ and the code length $K=24$.
+
+Three algorithms are compared in the experiments:
+\begin{itemize}
+    \item \textbf{Random Sampling} (\mbox{Random}), which randomly selects examples to label. This is essentially a passive hashing method.\footnote{But unlike other passive hashing methods, the labeled set does grow in size.  This is similar to some active learning methods with random data selection.  So it is still ``active'' in some sense.}
+    \item \textbf{Greedy Active Hashing} (\mbox{GAH}), which selects one point with the smallest $\tilde{f}_i$ in each iteration.
+    \item \textbf{Batch Mode Active Hashing} (\mbox{BMAH}), which selects a batch of $M$ points by solving Problem~(\ref{equation:ah:relax}).
+\end{itemize}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Image Retrieval}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsubsection{Data set}
+The \mbox{MNIST} data set\footnote{http://yann.lecun.com/exdb/mnist/} consists of $70,000$ images of handwritten digits.  Each image has $28\times28$ pixels and is associated with a label from 0 to 9. We use the gray-scale intensity values of the images as features resulting in a 784-dimensional vector space.  The data set is split into a training set of $69,000$ images and a test set of $1,000$ images.
+
+%%%%%%%%%%%%%%%%%%%
+\subsubsection{Comparison of \mbox{BMAH} and \mbox{GAH}}
+\label{section:comp-bmah-gah-mnist}
+
+We first compare two \mbox{AH} algorithms, \mbox{BMAH} and \mbox{GAH}. Initially, we randomly choose 100 points and their labels from the training set to form $\mathcal{L}^0$ and use the remaining data as $\mathcal{U}^0$. We then use \mbox{BMAH} and \mbox{GAH} individually to select $M$ points\footnote{We note that \mbox{GAH} selects only one example in each iteration, so it needs $M$ iterations to select a total of $M$ points. However, \mbox{BMAH} can select all $M$ points in a single iteration.} and report the retrieval results of the hash functions learned from the updated training set.  We use $\lambda=0.4$ for \mbox{BMAH}.\footnote{The reason why we set $\lambda=0.4$ will be made clear later.} The procedure is repeated 10 times and the average results, as well as their standard deviations, and total time cost (in seconds) for different values of $M$ are reported in Table~\ref{table:mnist-greedy}.
+
+\begin{table}[htb]
+\centering
+\caption{Comparison of \mbox{BMAH} and \mbox{GAH} for image retrieval}
+\begin{tabular}{|c|c|c|c|c|}
+\toprule[0.8pt]\addlinespace[0pt]
+$M$ & Method &  Precision &  Recall& Time Cost (seconds)\\
+\addlinespace[0pt]\midrule[0.8pt]\addlinespace[0pt]
+\multirow{2}{1.5em}{\centering 50}&\mbox{BMAH}&${0.6096}{\pm0.0009}$&${0.0438}{\pm0.0001}$&195.03\\\cline{2-5}
+&\mbox{GAH}&${0.6096}{\pm0.0007}$&${0.0438}{\pm0.0001}$&482.23\\
+\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+\multirow{2}{1.5em}{\centering 100}&\mbox{BMAH}&${0.6097}{\pm0.0007}$&${0.0438}{\pm0.0001}$&214.23\\\cline{2-5}
+&\mbox{GAH}&${0.6100}{\pm0.0007}$&${0.0438}{\pm0.0001}$&887.60\\
+\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+\multirow{2}{1.5em}{\centering 150}&\mbox{BMAH}&${0.6107}{\pm0.0009}$&${0.0438}{\pm0.0001}$&352.49\\\cline{2-5}
+&\mbox{GAH}&${0.6120}{\pm0.0009}$&${0.0439}{\pm0.0001}$&1563.03\\
+\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+\multirow{2}{1.5em}{\centering 200}&\mbox{BMAH}&${0.6113}{\pm0.0012}$&${0.0439}{\pm0.0001}$&433.81\\\cline{2-5}
+&\mbox{GAH}&${0.6154}{\pm0.0013}$&${0.0442}{\pm0.0001}$&1744.36\\
+ \addlinespace[0pt]\bottomrule[0.8pt]
+\end{tabular}
+\label{table:mnist-greedy}
+\end{table}
+
+From Table~\ref{table:mnist-greedy}, we observe that \mbox{BMAH} and \mbox{GAH} are comparable in performance in terms of both precision and recall, showing that there is not much redundancy among the most informative points. However, \mbox{GAH} has much higher computational time cost than \mbox{BMAH}. Therefore, we exclude \mbox{GAH} in the subsequent experiments.
+
+%%%%%%%%%%%%%%%%%%%
+\subsubsection{Comparison of \mbox{BMAH} and \mbox{Random}}
+
+In this section, we compare \mbox{BMAH} with \mbox{Random}. We again choose $100$ random points from the training set to form $\mathcal{L}^{0}$ and use the remaining data as $\mathcal{U}^{0}$. For \mbox{BMAH}, we set the parameters to be $M = 100$ and $\lambda = 0.4$. The whole process is repeated 10 times and we plot the average results and their standard deviations in Fig.~\ref{fig:apt-largemnist-24b}.
+
+\begin{figure}[htb]
+\vspace{-1.5cm}
+\subfigure[Learning curves \wrt precision]{
+    \begin{minipage}[b]{0.48\linewidth}
+%        \centering
+        \epsfig{figure=fig/ah/activepoint-largemnist-precision500-24b5, width=1.0\textwidth}\vspace{-2cm}
+        \label{fig:apt-largemnist-precision-24b}
+    \end{minipage}}
+\subfigure[Learning curves \wrt recall]{
+    \begin{minipage}[b]{0.48\linewidth}
+%        \centering
+        \epsfig{figure=fig/ah/activepoint-largemnist-recall500-24b5, width=1.0\textwidth}\vspace{-2cm}
+        \label{fig:apt-largemnist-recall-24b}
+    \end{minipage}}
+\caption{Learning curves of \mbox{BMAH} and \mbox{Random} for image retrieval}
+\label{fig:apt-largemnist-24b}
+\end{figure}
+
+We can see from the figures that \mbox{BMAH} performs much better than \mbox{Random}, especially at the late stage. We observe that the performance of \mbox{Random} degrades as more labels are obtained. This can be attributed to the limitation of passive hashing as introduced in Section~\ref{AH:motivation}. On the other hand, \mbox{BMAH} can overcome this problem by selecting the most uncertain points because these points are likely to locate near the class boundary and hence the difference between points in a dissimilar pair may be small.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsubsection{Varying initial label size $|\mathcal{L}^{0}|$}
+\label{section:comp-initsize-mnist}
+
+To evaluate the effect of the initial label size on \mbox{BMAH} and \mbox{Random}, we conduct some experiments by varying the value of $|\mathcal{L}^0|$. The parameters of \mbox{BMAH} are $M=10$ and $\lambda = 0.4$. For each $|\mathcal{L}^0|$ value, the whole procedure is repeated 10 times and the average results, as well as standard deviations, after selecting $1,000$ points are reported in Table~\ref{table:mnist-initsize}, where boldface numbers indicate better results.
+
+\begin{table}[htb]
+\centering
+\caption{Comparison of \mbox{BMAH} and \mbox{Random} with varying initial label size $|\mathcal{L}^{0}|$}
+\vspace{0.2cm}
+\label{table:mnist-initsize}
+%\begin{center}
+\begin{tabular}{|c|c|c|c|}
+\toprule[0.8pt]\addlinespace[0pt]
+$|\mathcal{L}^{0}|$ & Method &  Precision &  Recall\\
+\addlinespace[0pt]\midrule[0.8pt]\addlinespace[0pt]
+\multirow{2}{3.5em}{\centering 100}&Random&${0.6416}{\pm0.0103}$&${0.0460}{\pm0.0007}$\\\cline{2-4}
+                        &\mbox{BMAH}&${\textbf{0.6793}}{\pm0.0033}$&${\textbf{0.0489}}{\pm0.0002}$\\
+\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+\multirow{2}{3.5em}{\centering 200}&Random&${0.6430}{\pm0.0087}$&${0.0461}{\pm0.0006}$\\\cline{2-4}
+                    &\mbox{BMAH}&${\textbf{0.6941}}{\pm0.0025}$&${\textbf{0.0500}}{\pm0.0002}$\\
+\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+\multirow{2}{3.5em}{\centering 300}&Random&${0.6518}{\pm0.0119}$&${0.0467}{\pm0.0009}$\\\cline{2-4}
+                &\mbox{BMAH}&${\textbf{0.6985}}{\pm0.0052}$&${\textbf{0.0502}}{\pm0.0004}$\\
+\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+\multirow{2}{3.5em}{\centering 400}&Random&${0.6474}{\pm0.0150}$&${0.0464}{\pm0.0011}$\\\cline{2-4}
+                    &\mbox{BMAH}&${\textbf{0.7053}}{\pm0.0060}$&${\textbf{0.0507}}{\pm0.0004}$\\
+\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+\multirow{2}{3.5em}{\centering 500}&Random&${0.6417}{\pm0.0135}$&${0.0460}{\pm0.0010}$\\\cline{2-4}
+                &\mbox{BMAH}&${\textbf{0.7073}}{\pm0.0090}$&${\textbf{0.0509}}{\pm0.0007}$\\
+ \addlinespace[0pt]\bottomrule[0.8pt]
+\end{tabular}
+%\end{center}
+\end{table}
+
+From Table~\ref{table:mnist-initsize}, we can easily see that \mbox{BMAH} is consistently better than \mbox{Random}. It is interesting to observe that the precision and recall of \mbox{BMAH} keep increasing as $|\mathcal{L}^0|$ increases, but those of \mbox{Random} first increase and then decrease. This is reasonable since \mbox{BMAH} can find informative points more accurately with more initially labeled points whereas the active selection procedure of \mbox{Random} is independent of $\mathcal{L}^{0}$.
+
+
+%%%%%%%%%%%%%%%%%%%
+\subsubsection{Varying batch size $M$}
+\label{section:comp-batch-mnist}
+
+To study the effect of the batch size on \mbox{BMAH} and \mbox{Random}, we conduct several experiments by varying $M$. We set $|\mathcal{L}^{0}|=100$ for both methods and $\lambda = 0.4$ for \mbox{BMAH}. The average results over 10 repeats, and the corresponding standard deviations, after selecting $10M$ points are reported in Table~\ref{table:mnist-batchsize}.
+
+%, where again boldface numbers indicate better results.
+\begin{table}[htb] 
+\centering
+\caption{Comparison of \mbox{BMAH} and \mbox{Random} with varying batch size $M$}
+%\vspace{0.2cm}
+\label{table:mnist-batchsize}
+%\begin{center}
+\begin{tabular}{|c|c|c|c|}
+\toprule[0.8pt]\addlinespace[0pt]
+$M$ & Method &  Precision &  Recall\\
+\addlinespace[0pt]\midrule[0.8pt]\addlinespace[0pt]
+\multirow{2}{3.5em}{\centering 50}&Random&$\textbf{0.6292}{\pm0.0026}$&$\textbf{0.0452}{\pm0.0002}$\\\cline{2-4}
+&\mbox{BMAH}&${{0.6262}}{\pm0.0017}$&${{0.0450}}{\pm0.0001}$\\
+\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+\multirow{2}{3.5em}{\centering 100}&Random&${0.6416}{\pm0.0103}$&${0.0460}{\pm0.0007}$\\\cline{2-4}
+&\mbox{BMAH}&${\textbf{0.6793}}{\pm0.0033}$&${\textbf{0.0489}}{\pm0.0002}$\\
+\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+\multirow{2}{3.5em}{\centering 150}&Random&${0.6392}{\pm0.0082}$&${0.0458}{\pm0.0006}$\\\cline{2-4}
+&\mbox{BMAH}&${\textbf{0.6988}}{\pm0.0084}$&$\textbf{{0.0504}}{\pm0.0006}$\\
+\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+\multirow{2}{3.5em}{\centering 200}&Random&${0.6302}{\pm0.0130}$&${0.0452}{\pm0.0009}$\\\cline{2-4}
+&\mbox{BMAH}&${\textbf{0.7068}}{\pm0.0046}$&${\textbf{0.0509}}{\pm0.0003}$\\
+ \addlinespace[0pt]\bottomrule[0.8pt]
+\end{tabular}
+%\end{center}
+\end{table}
+
+From Table~\ref{table:mnist-batchsize}, it is easy to see that a larger value of $M$ also induces a larger performance gap between \mbox{BMAH} and \mbox{Random}. This is quite reasonable because larger $M$ implies that 1) \mbox{BMAH} will select more informative points than \mbox{Random}; 2) the limitation of passive hashing will be reduced more by \mbox{BMAH}.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsubsection{Varying balancing parameter $\lambda$}
+\label{section:comp-lambda-mnist}
+In Problem~(\ref{equation:ah:relax}), the balancing parameter $\lambda$ controls the balance between selecting the most uncertain points and reducing the redundancy among the selected data points. In this last group of experiments, we study the effect of $\lambda$ by varying its value from $0$ to $1$. For each value of $\lambda$, the result is averaged over 10 random repeats. We plot learning curves \wrt precision and recall in Fig.~\ref{fig:apt-largemnist-24b-qp}. Note that the value of $\lambda$ is indicated by the superscript of \mbox{BMAH}.
+
+%In following experiments,. The whole procedure is repeated 10 times, and the average results and standard deviation after selecting $1,000$ points are reported.
+
+\begin{figure}[htb]
+%\vspace{-1.5cm}
+%\centering
+\subfigure[Learning curves \wrt precision]{
+    \begin{minipage}[b]{0.48\linewidth}
+%        \centering
+        \epsfig{figure=fig/ah/activepoint-largemnist-precision500-24b-qp5, width=1.0\textwidth}%\vspace{-2cm}
+        \label{fig:apt-largemnist-precision-24b-qp}
+    \end{minipage}}
+\subfigure[Learning curves \wrt recall]{
+    \begin{minipage}[b]{0.48\linewidth}
+%        \centering
+        \epsfig{figure=fig/ah/activepoint-largemnist-recall500-24b-qp5, width=1.0\textwidth}%\vspace{-2cm}
+        \label{fig:apt-largemnist-recall-24b-qp}
+    \end{minipage}}
+\caption{Learning curves of \mbox{BMAH} with varying balancing parameter $\lambda$ for image retrieval. The parameters of \mbox{BMAH} are set as $|\mathcal{L}^{0}|=100$ and $M = 100$.}
+\label{fig:apt-largemnist-24b-qp}
+\end{figure}
+
+From Fig.~\ref{fig:apt-largemnist-24b-qp}, we observe that \mbox{BMAH} is not very sensitive to $\lambda$ and $\lambda=0.4$ achieves the best performance after 30 iterations. We believe that  there is little redundancy among the most uncertain data points, so varying $\lambda$ in such a small range does not have much effect on the model performance.
+%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsubsection{Varying code length $K$}
+
+We have observed that \mbox{BMAH} is very effective with a fixed code length, i.e., $ K=24 $. But is it also effective when we set the code length $ K $ to other values? To answer this question, we conducted a group of experiments by running \mbox{BMAH} with different $ K $ values. The learning curves of \mbox{BMAH} averaged over 10 random repeats are plotted in Fig.~\ref{fig:apt-largemnist-fullb}. %Our expectation is \mbox{BMAH} outperforms \mbox{Random} in all code lengths.
+
+\begin{figure}[htb]
+%\vspace{-1.5cm}
+%\centering
+\subfigure[Learning curves \wrt precision]{
+    \begin{minipage}[b]{0.48\linewidth}
+%        \centering
+        \epsfig{figure=fig/ah/activepoint-largemnist-precision500-fullb5, width=1.0\textwidth}%\vspace{-2cm}
+        %\label{fig:apt-largemnist-precision-12b-qp}
+    \end{minipage}}
+\subfigure[Learning curves \wrt recall]{
+    \begin{minipage}[b]{0.48\linewidth}
+%        \centering
+        \epsfig{figure=fig/ah/activepoint-largemnist-recall500-fullb5, width=1.0\textwidth}%\vspace{-2cm}
+        %\label{fig:apt-largemnist-recall-12b-qp}
+    \end{minipage}}
+\caption{Learning curves of \mbox{BMAH} with varying code length $K$ for text retrieval. The parameters of \mbox{BMAH} are set as $\lambda=0.4,|\mathcal{L}^{0}|=100$ and $M = 100$.}
+\label{fig:apt-largemnist-fullb}
+\end{figure}
+
+From Fig.~\ref{fig:apt-largemnist-fullb}, we observe that larger code length gives better performance and, for all three different code lengths, \mbox{BMAH} consistently improves as more labeled data are added. The results validate the effectiveness of \mbox{BMAH}.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Text Retrieval}
+
+\subsubsection{Data set}
+
+The 20 Newsgroups (\mbox{NEWS}) data set\footnote{http://people.csail.mit.edu/jrennie/20Newsgroups/} was originally collected for document classification. We use the popular `bydate' version which contains $18{,}846$ documents evenly distributed across 20 categories. Each document is labeled by exactly one of the 20 labels. In our experiments, we randomly select $1{,}000$ documents as the test set and use the remaining documents as the training set. The original data set contains $26{,}214$ features generated by the \emph{tf$\cdot$idf} scheme~\cite{salton1988ipm}. In our experiments, we extract $1{,}000$ features by applying principal component analysis (\mbox{PCA}).
+
+%%%%%%%%%%%%%%%%%%%
+\subsubsection{Comparison of \mbox{BMAH} and \mbox{GAH}}
+\label{section:comp-bmah-gah-news}
+
+The first group of experiments is to compare \mbox{BMAH} and \mbox{GAH}. We randomly choose 50 points and their labels to form $\mathcal{L}^0$ and use the remaining data as $\mathcal{U}^0$. Moreover, we set $\lambda=0.4$ for \mbox{BMAH}. The procedure is repeated 10 times and the average results after selecting $M$ points are reported in Table~\ref{table:news-greedy}. The results in Table~\ref{table:news-greedy} are very similar to those in Table~\ref{table:mnist-greedy}, and for the same reason, we omit \mbox{GAH} in the following experiments.
+
+%\vspace{-0.1cm}
+ \begin{table}[htb]
+ \centering
+\caption{Comparison of \mbox{BMAH} and \mbox{GAH} for text retrieval}
+%\vspace{-0.1cm}
+\label{table:news-greedy}
+%\begin{center}
+\begin{tabular}{|c|c|c|c|c|}
+\toprule[0.8pt]\addlinespace[0pt]
+$M$ & Method &  Precision &  Recall& Time Cost (seconds)\\
+\addlinespace[0pt]\midrule[0.8pt]\addlinespace[0pt]
+\multirow{2}{1.5em}{\centering 50}&\mbox{BMAH}&${0.3373}{\pm0.0012}$&${0.1857}{\pm0.0006}$&67.44\\\cline{2-5}
+&\mbox{GAH}&${0.3375}{\pm0.0011}$&${0.1858}{\pm0.0006}$&473.28\\
+\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+\multirow{2}{1.5em}{\centering 100}&\mbox{BMAH}&${0.3377}{\pm0.0022}$&${0.1859}{\pm0.0012}$&79.88\\\cline{2-5}
+&\mbox{GAH}&${0.3374}{\pm0.0017}$&${0.1857}{\pm0.0009}$&958.04\\
+\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+\multirow{2}{1.5em}{\centering 150}&\mbox{BMAH}&${0.3441}{\pm0.0043}$&${0.1894}{\pm0.0023}$&219.34\\\cline{2-5}
+&\mbox{GAH}&${0.3420}{\pm0.0033}$&${0.1882}{\pm0.0018}$&2058.31\\
+\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+\multirow{2}{1.5em}{\centering 200}&\mbox{BMAH}&${0.3520}{\pm0.0043}$&${0.1935}{\pm0.0023}$&469.08\\\cline{2-5}
+&\mbox{GAH}&${0.3492}{\pm0.0033}$&${0.1921}{\pm0.0018}$&2612.79\\
+ \addlinespace[0pt]\bottomrule[0.8pt]
+\end{tabular}
+%\end{center}
+\end{table}
+
+
+
+%%%%%%%%%%%%%%%%%%%
+\subsubsection{Comparison of \mbox{BMAH} and \mbox{Random}}
+
+We compare \mbox{BMAH} with \mbox{Random} in this section. Similarly, we set $|\mathcal{L}^{0}|=50$ for both methods and $M = 50$ and $\lambda = 0.4$ for \mbox{BMAH}. We plot the results averaged over 10 random repeats and their standard deviations in Fig.~\ref{fig:apt-news-24b}.
+
+\begin{figure}[htb]
+\vspace{-1.5cm}
+\subfigure[Learning curves \wrt precision]{
+    \begin{minipage}[b]{0.48\linewidth}
+%        \centering
+        \epsfig{figure=fig/ah/activepoint-news-precision500-24b5, width=1.0\textwidth}\vspace{-2cm}
+        \label{fig:apt-news-precision-24b}
+    \end{minipage}}
+\subfigure[Learning curves \wrt recall]{
+\begin{minipage}[b]{0.48\linewidth}
+%    \centering
+    \epsfig{figure=fig/ah/activepoint-news-recall500-24b5, width=1.0\textwidth}\vspace{-2cm}
+    \label{fig:apt-news-recall-24b}
+\end{minipage}}
+\caption{Learning curves of \mbox{BMAH} and \mbox{Random} for text retrieval}
+\label{fig:apt-news-24b}
+\end{figure}
+
+From the figures, we can easily see that the performance of \mbox{Random} is better than that of \mbox{BMAH} at the early stage but degrades very fast afterwards. This is reasonable because there are 20 categories in the data set and initially the selected points can only cover a small portion of them. In the beginning, \mbox{Random} uniformly selects points from all the categories but \mbox{BMAH} focuses on those points that are uncertain with respect to the current hash functions and hence might be biased. However, this kind of bias will be corrected when more labeled data points are added. Thus, the precision of \mbox{BMAH} continues to increase at a later stage but that of \mbox{Random} drops due to the limitation of passive hashing.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsubsection{Varying initial label size $|\mathcal{L}^{0}|$}
+\label{section:comp-initsize-news}
+In this group of experiments, we vary the initial label size $|\mathcal{L}^0|$ to study its effect on \mbox{BMAH} and \mbox{Random}. The parameters are set to $M=50$ and $\lambda = 0.4$. The whole procedure is repeated 10 times and the average results, together with standard deviations, after selecting $30M$ points are reported in Table~\ref{table:news-initsize}.
+
+\begin{table}[htb]
+\centering
+\caption{Comparison of \mbox{BMAH} and \mbox{Random} with varying initial label size $|\mathcal{L}^{0}|$}
+%\vspace{0.2cm}
+\label{table:news-initsize}
+%\begin{center}
+\begin{tabular}{|c|c|c|c|}
+\toprule[0.8pt]\addlinespace[0pt]
+$|\mathcal{L}^{0}|$ & Method &  Precision &  Recall\\
+\addlinespace[0pt]\midrule[0.8pt]\addlinespace[0pt]
+\multirow{2}{3.5em}{\centering 50}&Random&${0.3765}{\pm0.0188}$&${0.2081}{\pm0.0103}$\\\cline{2-4}
+&\mbox{BMAH}&${\textbf{0.4993}}{\pm0.0112}$&${\textbf{0.2752}}{\pm0.0062}$\\
+\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+\multirow{2}{3.5em}{\centering100}&Random&${0.3731}{\pm0.0250}$&${0.2063}{\pm0.0137}$\\\cline{2-4}
+&\mbox{BMAH}&${\textbf{0.4961}}{\pm0.0140}$&${\textbf{0.2737}}{\pm0.0076}$\\
+\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+\multirow{2}{3.5em}{\centering150}&Random&${0.3726}{\pm0.0155}$&${0.2060}{\pm0.0083}$\\\cline{2-4}
+&\mbox{BMAH}&${\textbf{0.4945}}{\pm0.0124}$&${\textbf{0.2730}}{\pm0.0065}$\\
+\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+\multirow{2}{3.5em}{\centering200}&Random&${0.3620}{\pm0.0147}$&${0.2002}{\pm0.0078}$\\\cline{2-4}
+&\mbox{BMAH}&${\textbf{0.5068}}{\pm0.0140}$&${\textbf{0.2796}}{\pm0.0076}$\\
+\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+\multirow{2}{3.5em}{\centering250}&Random&${0.3666}{\pm0.0144}$&${0.2026}{\pm0.0079}$\\\cline{2-4}
+&\mbox{BMAH}&${\textbf{0.5064}}{\pm0.0148}$&${\textbf{0.2792}}{\pm0.0080}$\\
+ \addlinespace[0pt]\bottomrule[0.8pt]
+\end{tabular}
+%\end{center}
+\end{table}
+
+In Table~\ref{table:news-initsize}, \mbox{BMAH} consistently outperforms \mbox{Random}. It is interesting to observe that the precision and recall of \mbox{BMAH} keep increasing as $|\mathcal{L}^0|$ increases, but those of \mbox{Random} first increase and then drop. This can be explained by the same reason in Section~\ref{section:comp-initsize-mnist}.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsubsection{Varying batch size $M$}
+\label{section:comp-batch-news}
+
+In this section, we evaluate the effect of the batch size $M$ on \mbox{BMAH} and \mbox{Random}. We set $|\mathcal{L}^{0}|=50$ for both methods and $\lambda = 0.4$ for \mbox{BMAH}. The whole process is repeated 10 times, and the average results and standard deviations, after selecting $20M$ points, are reported in Table~\ref{table:news-batchsize}.
+
+\begin{table}[htb]
+\centering
+\caption{Comparison of \mbox{BMAH} and \mbox{Random} with varying batch size $M$}
+%\vspace{0.2cm}
+\label{table:news-batchsize}
+%\begin{center}
+\begin{tabular}{|c|c|c|c|}
+\toprule[0.8pt]\addlinespace[0pt]
+$M$ & Method &  Precision &  Recall\\
+\addlinespace[0pt]\midrule[0.8pt]\addlinespace[0pt]
+\multirow{2}{3.5em}{\centering 50}&Random&${0.4302}{\pm0.0201}$&${0.2374}{\pm0.0106}$\\\cline{2-4}
+&\mbox{BMAH}&${\textbf{0.4399}}{\pm0.0121}$&${\textbf{0.2426}}{\pm0.0065}$\\
+\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+\multirow{2}{3.5em}{\centering 100}&Random&${0.3432}{\pm0.0173}$&${0.1900}{\pm0.0093}$\\\cline{2-4}
+&\mbox{BMAH}&${\textbf{0.5001}}{\pm0.0220}$&${\textbf{0.2766}}{\pm0.0119}$\\
+\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+\multirow{2}{3.5em}{\centering 150}&Random&${0.2983}{\pm0.0170}$&${0.1655}{\pm0.0091}$\\\cline{2-4}
+&\mbox{BMAH}&${\textbf{0.4076}}{\pm0.0239}$&${\textbf{0.2248}}{\pm0.0131}$\\
+\addlinespace[0pt]\midrule[0.5pt]\addlinespace[0pt]
+\multirow{2}{3.5em}{\centering 200}&Random&${0.2718}{\pm0.0132}$&${0.1511}{\pm0.0071}$\\\cline{2-4}
+&\mbox{BMAH}&${\textbf{0.3266}}{\pm0.0267}$&${\textbf{0.1806}}{\pm0.0148}$\\
+ \addlinespace[0pt]\bottomrule[0.8pt]
+\end{tabular}
+%\end{center}
+\end{table}
+
+From Table~\ref{table:news-batchsize}, we see that increasing $M$ will degrade the performance of both \mbox{BMAH} and \mbox{Random}. This observation is different from what we have observed in Section~\ref{section:comp-batch-mnist}. In this data set, the limitation of passive hashing is much more severe since there are 20 categories. Hence \mbox{BMAH} cannot completely eliminate the limitation as in the previous task. However, the performance drop of \mbox{BMAH} is much slower than that of \mbox{Random}. This still demonstrates that \mbox{BMAH} is capable of overcoming the limitation of passive hashing slightly.
+
+%%%%%%%%%%%%%%%%%%%
+\subsubsection{Varying balancing parameter $\lambda$}
+
+To study the sensitivity of \mbox{BMAH} to the balancing parameter $\lambda$, we conduct some experiments by varying $\lambda$ from $0$ to $1$. The learning curves averaged over 10 random repeats are plotted in Fig.~\ref{fig:apt-news-24b-qp}. Similar to before, we use superscripts to indicate the values of $\lambda$.
+
+\begin{figure}[htb]
+%\vspace{-1.5cm}
+\subfigure[Learning curves \wrt precision]{
+    \begin{minipage}[b]{0.48\linewidth}
+%        \centering
+        \epsfig{figure=fig/ah/activepoint-news-precision500-24b-qp5, width=1.0\textwidth} %\vspace{-2cm}
+        \label{apt-news-precision-24b-qp}
+    \end{minipage}}
+\subfigure[Learning curves \wrt recall]{
+    \begin{minipage}[b]{0.48\linewidth}
+%        \centering
+        \epsfig{figure=fig/ah/activepoint-news-recall500-24b-qp5, width=1.0\textwidth} %\vspace{-2cm}
+        \label{fig:apt-news-recall-24b-qp}
+    \end{minipage}}
+\caption{Learning curves of \mbox{BMAH} with varying balancing parameter $\lambda$ for text retrieval. The parameters of \mbox{BMAH} are set as $|\mathcal{L}^{0}|=50$ and $M = 50$.}
+\label{fig:apt-news-24b-qp}
+\end{figure}
+
+From Fig.~\ref{fig:apt-news-24b-qp}, we see that \mbox{BMAH} is not very sensitive to $\lambda$, and $\lambda=0.4$ achieves the best performance after 30 iterations. This again can be explained by the same reason in Section~\ref{section:comp-lambda-mnist}.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsubsection{Varying code length $K$}
+
+In this last subsection, we study the performance of \mbox{BMAH} by varying the code length $ K $. The learning curves of \mbox{BMAH}, averaged over 10 random repeats, with different $ K $ are plotted in Fig.~\ref{fig:apt-news-fullb}. %Our expectation is \mbox{BMAH} outperforms \mbox{Random} in all code lengths.
+
+\begin{figure}[htb]
+%\vspace{-1.5cm}
+%\centering
+\subfigure[Learning curves \wrt precision]{
+    \begin{minipage}[b]{0.48\linewidth}
+%        \centering
+        \epsfig{figure=fig/ah/activepoint-news-precision500-fullb5, width=1.0\textwidth}%\vspace{-2cm}
+        \label{fig:apt-largemnist-precision-12b-qp}
+    \end{minipage}}
+\subfigure[Learning curves \wrt recall]{
+    \begin{minipage}[b]{0.48\linewidth}
+%        \centering
+        \epsfig{figure=fig/ah/activepoint-news-recall500-fullb5, width=1.0\textwidth}%\vspace{-2cm}
+        \label{fig:apt-largemnist-recall-12b-qp}
+    \end{minipage}}
+\caption{Learning curves of \mbox{BMAH} with varying code length $K$ for text retrieval. The parameters of \mbox{BMAH} are set as $\lambda=0.4,|\mathcal{L}^{0}|=50$ and $M = 50$.}
+\label{fig:apt-news-fullb}
+\end{figure}
+
+From Fig.~\ref{fig:apt-news-fullb}, we observe that the performance of \mbox{BMAH} improves as more labeled data are incorporated no matter how long the hash codes are. This again validates the effectiveness of \mbox{BMAH}.
+
+ % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
+\section{Conclusion}
+\label{AH:conclusion}
+To summarize, we have proposed a new hashing framework to actively learn hash functions from both unlabeled and labeled data. We have utilized the uncertainty criterion, which is commonly used in many active learning methods, to give a simple and efficient active hashing algorithm. Experimental results show that our framework can effectively identify the most informative points for the expert to label and can overcome the limitations of existing supervised \mbox{HFL} methods. 
+
+Though being effective and easy to implement, the uncertainty-based active hashing method does not directly optimize the quality of the learned hash functions. As such, to take this work further, we plan to explore other criteria of informativeness for active hashing. For example, we may select the points which maximize some information gain or minimize some expected loss functions which are directly related to the quality of hash functions. Moreover, although we have demonstrated that it is very effective to select points to label first and then construct point pairs, it might be better to select point pairs directly to make it computationally more efficient. Last but not least, another possible research direction is to explore other batch mode algorithms for active hashing.
+
+%some other informativeness criteria which are more closely related to hash function quality are worthy of investigation.

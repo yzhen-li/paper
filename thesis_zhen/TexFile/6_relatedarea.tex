@@ -1,0 +1,72 @@
+\chapter{Related Areas}
+\label{chap:relatedareas}
+In spite of being a new research topic, hash function learning is closely related to many other research topics in the areas of machine learning, data mining and computer vision. In this chapter, we briefly review two closest research areas, i.e., metric learning and active learning.
+
+ % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
+\section{Metric Learning}
+Metric learning is an important problem in the machine learning and pattern recognition communities. The objective is to learn an optimal metric, either linear or nonlinear, in the original feature space or the reproducing kernel Hilbert
+space, from training data. According to whether or not label or side-information is used to learn the metric, existing methods can be classified into the categories of unsupervised metric learning or supervised metric learning. In the following, we briefly review some typical works in each category. For a detailed review, we refer the interested readers to~\cite{yang2006tech}.
+
+\subsection{Unsupervised Metric Learning}
+One typical case of unsupervised metric learning is linear dimensionality reduction. The most classic methods are \textit{principal component analysis} (\mbox{PCA}) and \textit{multidimensional scaling} (\mbox{MDS}). While \mbox{PCA} finds the subspace that best preserves the variance of the data, \mbox{MDS} finds the projection that best preserves the pairwise distance. The two methods are equivalent when \mbox{MDS} uses Euclidean distance. Despite being simple, efficient, and guaranteed to optimize their criteria, these linear methods could be very limited because they cannot find the nonlinear structure in the data.
+
+To reveal the nonlinear structures of data, lots of nonlinear dimensionality reduction algorithms have been proposed. \mbox{ISOMAP}~\cite{tenenbaum2000science} assumes that isometric properties should be preserved in both the observation space and the intrinsic embedding space. According to this assumption, \mbox{ISOMAP} finds the subspace that best preserves the geodesic inter-point distance. Unlike \mbox{ISOMAP} that tries to preserve the geodesic distance for any pair of data points, \textit{locally linear embedding} (\mbox{LLE})~\cite{Roweis2000science} and \textit{Laplacian Eigenmap}~\cite{belkin2003nc} focus on the preservation of the local neighbor structure. As an extension of~\cite{belkin2003nc}, \textit{locality preserving projection} (\mbox{LPP})~\cite{he2003nips} finds linear projective mappings that optimally preserve the neighborhood structure of the data. Mutual information which measures the differences between probability distributions has also been introduced to dimensionality reduction methods. Related work includes \textit{stochastic neighbor embedding} (\mbox{SNE})~\cite{hinton2002nips} and \textit{manifold charting}~\cite{brand2002nips}.
+%It is an optimal linear approximation to the eigenfunctions of the Laplace-Beltrami Operator on the manifold.
+
+\subsection{Supervised Metric Learning}
+Supervised metric learning algorithms are designed to learn either from the class labels or the side information which is often cast in the form of pairwise constraints (i.e., must-link constraints and cannot-link constraints). In~\cite{xing2002nips}, Xing \etal propose to learn a distance metric from the pairwise constraints. The optimal kernel is found to minimize the distance between data points in must-link constraints and simultaneously maximize the distance between data points in cannot-link constraints. \textit{Relevance component analysis}~\cite{shental2002eccv} is another popular approach, in which data points in the same classes are grouped in \textit{chunklets}, and the distance metric is computed based on the covariance matrix estimated from each \textit{chunklet}. Goldberger \etal~\cite{goldberger2004nips} develop an algorithm, abbreviated as \textit{neighborhood component analysis}, which combines metric learning with k-nearest neighbor (KNN) classification. Globerson \etal~\cite{globerson2005nips} present an algorithm to collapse data samples in the same class into a single point and make samples belonging to different classes far apart. Recently, an information-theoretic based approach~\cite{davis2007icml} developed by Davis \etal is reported to achieve the state-of-the-art performance.
+
+Empirical studies show that supervised metric learning algorithms usually outperform the unsupervised ones. However, most of the supervised metric learning algorithms need to solve non-trivial optimization problems, and thus are computationally expensive.
+
+%particularly when the data are in large-scale and with high dimensionality.
+
+
+\subsection{Summary}
+Both metric learning and hash function learning try to learn a proper metric from data, but they are different in several aspects. First of all, the learned metric in hash function learning is Hamming distance while that of metric learning is usually Euclidean distance. Secondly, hash function learning maps data into binary codes whereas metric learning often maps data into real vectors. Last but not the least, hash function learning and metric learning have quite different applications. Hash function learning aims to speed up approximate similarity search, but metric learning is usually applied to classification and recognition applications. Therefore, hash function learning put more focus on local similarity than conventional metric learning.
+
+%have quite different goals. Metric learning aims to learn a similarity metric while is the most propose for tasks at hand, while hash function learning targets at learn hash functions that can generate compact binary codes for similarity search. They are related since both of them defines a metric finally.
+
+ % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
+\section{Active Learning}
+As a research topic originally developed in the machine learning community, active learning has been widely applied in many areas such as computer vision, data mining and information retrieval. The task of active learning is to select the most informative data for experts to label with the goal of reducing the labeling cost, which might be expensive in many tasks. Over the past decades, a lot of algorithms have been proposed and gained great successes. 
+
+The major challenge of active learning is how to find the most informative data for specific applications effectively and efficiently. In the following, we briefly review some general criteria of data informativeness and corresponding well-known algorithms. The readers are encouraged to read~\cite{Settles2009survey,tong2001thesis} for detailed reviews. Please also be noted that we will use instance, example and data interchangeably in the sequel.
+
+\subsection{Uncertainty-based Active Learning}
+
+Perhaps the simplest and the most commonly used approach is \textit{uncertainty-based active learning} (\mbox{UAL})~\cite{lewis1994icml,Lewis1994sigir}. In this approach, the learner selects the instances, whose labels it is the most uncertain about, for experts to label. This method is very straightforward for classifiers with probabilistic outputs. Take binary classification problems for example, when the basic learner could predict the labels in a probabilistic way, such as $P(y=+1\mid \x)=0.8$, \mbox{UAL} will select the instance whose posterior probability of being positive (or negative) is nearest to $0.5$. However, this simple method will not be suitable in settings where there are more than two classes. A more general \mbox{UAL} method selects the data points maximizing the \textit{entropy} defined as follows:
+$$\x^*=\argmax\nolimits_{\x} H(\y\mid\x)=\argmax\nolimits_{\x} \left( -\sum\nolimits_i P(y_i\mid \x,\theta)\log P(y_i\mid \x,\theta)\right),$$
+where $H(\y\mid\x)=-\sum_i P(y_i\mid \x,\theta)\log P(y_i\mid \x,\theta)$ is called entropy which measures the uncertainty of label $\y$ given instance $\x$, $y_i$ ranges over all possible labels and $\theta$ is the model parameter. The criterion of entropy can be easily generalized to probabilistic models for more complex structured instances, such as sequences~\cite{Settles2008emnlp} and trees~\cite{Hwa2004CL}.
+
+An alternative to entropy-based \mbox{UAL} is selecting the instance whose \textit{most probable} label is the \textit{least confident}, which can be formulated as follows:
+$$\x^* = \argmin\nolimits_{\x} P(y^*\mid \x,\theta),$$
+where $y^* = \argmax_{y}P(y\mid \x, \theta)$ is the most probable class label of instance $\x$. This method has been shown to work especially well for information extraction tasks~\cite{Culotta2005aaai,Settles2008emnlp}.
+
+For classifiers without probabilistic outputs, \mbox{UAL} can also be applied if the outputs could be mapped to probabilities~\cite{Lindenbaum2004mlj,Fujii1998CL}. Take margin-based classifiers such as \mbox{SVM} for example, the certainty can be defined on the distance to the decision boundary~\cite{Tong2002jmlr}.
+
+Another general \mbox{UAL} method is \textit{query-by-committee} (\mbox{QBC})~\cite{Seung1992colt}. This approach maintains a group of classifiers, called a \textit{committee}, which are trained on the current labeled data. Each committee member represents one classifier, and is allowed to vote on the unlabeled instances. The most uncertain data are those whose labels the committee members have the largest disagreement on. Intuitively, the \mbox{QBC} strategy is to minimize the version space represented by the committee of classifiers.
+
+The approaches of \mbox{UAL} are not immune to selecting outliers, which have high uncertainty but are not helpful to the learner when labeled and incorporated into the training set. Examples are provided in~\cite{McCallum1998icml}.
+
+\subsection{Representativeness-based Active Learning}
+It has been argued that \mbox{UAL} methods are prone to querying outliers, which are useless, sometimes even harmful, for classifier training. To overcome this limitation, \textit{representativeness-based active learning} (\mbox{RAL}) has been proposed. The intuition of \mbox{RAL} methods is that the most informative data should be the most representative of the unlabeled data.
+
+Xu \etal~\cite{Xu2003ecir} might be the first to implement above intuition for \mbox{SVM} classifiers, using some simple heuristics. Instead of selecting the instances closest to the current \mbox{SVM} hyperplane, they first cluster the points in the margin of current model and then query the labels of cluster centroid. Similarly,~\cite{Nguyen2004icml} first clusters unlabeled instances and tries to avoid querying outliers by propagating label information from cluster centroid to instances in the same cluster. 
+
+Density-based active learning algorithms, which tend to select the instances from dense regions, could also be considered a special case of \mbox{RAL}, because the denser the region is, the more representative the instances (located in the region) are. These \mbox{RAL} approaches are always used in combination with \mbox{UAL} methods~\cite{Xu2007ecir,Settles2008emnlp}. In \cite{Xu2007ecir}, data informativeness is measured by relevance, density and diversity in the relevance feedback tasks. Similarly,~\cite{Settles2008emnlp} develops an information density framework for sequence labeling task to measure the uncertainty and representativeness of instances.
+
+In recent years, experimental design originated in statistics has been introduced as a new family of \mbox{RAL} methods. The seminal work is \textit{transductive experimental design}~\cite{Yu2006icml}, which extends traditional experimental design methods to the transductive setting for active learning. Some subsequent work includes convex relaxation of original problem~\cite{yu2008sigir}, and incorporation of \textit{Laplacian} regularization~\cite{he2007sigir} or  label information~\cite{zhen2010sigir}.
+
+
+\subsection{Minimal Loss Active Learning}
+
+
+In many real-world applications, the learned classifiers will eventually be evaluated on a test set. In another word, a better classifier should make less error on the test set. However, none of previous approaches directly optimize this objective, and this may explain why they do not work well in some circumstances. Intuitively, \textit{minimal loss active learning} (\mbox{MLAL}) aims to select the instances, when labeled and incorporated into the training set, leading to the largest error reduction on the test set. To evaluate the test error, we have to know the true labels of test instances. However, the true labels are unknown during the model training phase, as a result, the estimated (or expected) test error is used.
+
+\cite{cohn1996jair} proposes a statistically optimal solution, which selects the training examples that result in the lowest error on future test examples. In their analysis, this goal could be achieved by minimizing the variance of training data. The authors develop two simple algorithms with closed form solutions for regression problems. For classification problems, \cite{Roy2001icml} uses sampling approach to estimate the expected error reduction. And later, \cite{Zhu2003icmlws} combines this framework with a supervised learning approach, resulting in a dramatic improvement over conventional \mbox{UAL} methods.
+
+\mbox{MLAL} has the advantages of being near-optimal and independent of the types of classifiers. However, it may be the most prohibitively expensive strategy, because it requires not only estimating the expected future error over the unlabeled data at each learning iteration, but also retraining the classifier for each possible label of the instance. To reduce the computational cost, some researchers have resorted to subsampling the unlabeled data~\cite{Roy2001icml} or approximate training techniques~\cite{Guo07ijcai}.
+
+\subsection{Summary}
+Active learning and active hashing are common in that both of them aim to find most informative data for experts to label. As such, the criteria of informativeness might be similar in active learning and active hashing. But active learning is usually applied to classification, regression and ranking problems, which are very different from the approximate similarity search to which active hashing applies. This may lead to big difference in the definitions of informativeness, the formulations of optimization problems as well as the algorithms.
+
