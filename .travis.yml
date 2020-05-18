@@ -5,8 +5,8 @@ script:
   — wget https://raw.githubusercontent.com/blang/latex-docker/master/latexdockercmd.sh
 
   — chmod +x latexdockercmd.sh 
-  
-  — "./latexdockercmd.sh latexmk -xelatex -interaction=nonstopmode -halt-on-error ./thesis_zhen/thesis_zhen.tex -outdir=./_build"
+
+  — "latexdockercmd.sh latexmk -xelatex -interaction=nonstopmode -halt-on-error ./thesis_zhen/thesis_zhen.tex -outdir=./_build"
 deploy:
   provider: releases
   api_key: 222d011d95f0ac66bd5271a0bcd6ce12a2082f6f
