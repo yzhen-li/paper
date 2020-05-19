@@ -2,8 +2,13 @@ sudo: required
 dist: trusty
 services:
   — docker
+before_install:
+— docker pull blang/latex:ubuntu
+— docker run -v "$PWD":/data blang/latex:ubuntu /bin/sh -c "cd /data; pwd;"
+— docker ps -a
+# — docker run blang/latex:ubuntu /bin/sh -c "cd /root/sinatra; bundle exec rake test"
 script: 
-  — wget https://raw.githubusercontent.com/blang/latex-docker/master/latexdockercmd.sh
+  # — wget https://raw.githubusercontent.com/blang/latex-docker/master/latexdockercmd.sh
 
   — chmod +x latexdockercmd.sh 
 
@@ -15,10 +20,9 @@ script:
 
   — ls -hla
 
-  — "./latexdockercmd.sh pdflatex " 
+  # — "./latexdockercmd.sh pdflatex " 
 deploy:
   provider: releases
-  api_key: 222d011d95f0ac66bd5271a0bcd6ce12a2082f6f
   file: "./_build/thesis_zhen.pdf"
   on:
     repo: zhenyisx/paper
