@@ -1,19 +1,15 @@
-sudo: required 
-dist: trusty 
-services:
-  — docker 
-before_install: 
-  — docker pull blang/latex:ubuntu 
-
-  — docker run -v "$PWD":/data blang/latex:ubuntu /bin/bash -c "cd /data/thesis_zhen/; pdflatex ./thesis_zhen.tex -outdir=/data/_build;"  
-
-script: 
-  — pwd 
-
+sudo: required
+dist: trusty
+services: "— docker"
+before_install: |-
+  — docker pull blang/latex:ubuntu
+  — docker run -v "$PWD":/data blang/latex:ubuntu /bin/bash -c "cd /data/thesis_zhen/; pdflatex ./thesis_zhen.tex -outdir=/data/_build;"
+script: "— pwd"
 deploy:
   provider: releases
-  file: "./_build/thesis_zhen.pdf"
+  api_key:
+    secure: PqE0KkeTw6Fk0pl9y7e13B3bvXJvaqYNPDUG960qPA2gfvWgb+svYVpYU1kA/GIiDhq3oeuTV4/xl/vWbo6BKxxEfxDAY8uMZw2JsrVRqQcnXEjyO8EbmbdARegXgE38FB31YOyQ1DW12MUZQ2ByNq9JQxRz74I5kjpfn7IG84Jk+JqP7e3taRFp2Il0ll9MIVWop2tk978BaVr6YGmY/7lPaFszYiUzo2eZyv8k8Fsd6FZ5OKUoqULjEhvfAIUFJzpehowxb0KZzuxHvQbmOMq8zfFmijjiTiV128CJPlxmlGKKtnNs4/NjDlEkXCBJNbF1cmyqtsdVBVucWiHjhZDjjHxjxWYsS43fBg/13YIvSOMZUN9j3GqnEJuCSsq448R2jx16udWN534wKL40R91XDC1502K0GWhuSTcHYloapygXxBzXiF9SYVUdXJmktS6/Oz39CuO3OfifZf0ybkhjDu4TV2534KSRgLjGIYTiz2sQwtOdjMgf3RK13Ou0DJpiC2M15en3PSBcXr1D62Ukp52Cc6F5jXH8TEdLFB0i6NRgKTKl/9jIHXEDOzrXlkFQjx6sTdFneXq30CsQV/hhKz8gWoL6uOlPDpsvhv/7GDRXpm211yNYjNOLfo7wstEK2Weg4q+fCytWhkmYDkqshcKzdDDmBKLBXxgafnU=
+  file: _build/thesis_zhen.pdf
   on:
     repo: zhenyisx/paper
   skip_cleanup: 'true'
-
