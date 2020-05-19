@@ -6,22 +6,22 @@ services:
 before_install:
 — docker pull blang/latex:ubuntu
 
-— docker run -v "$PWD":/data blang/latex:ubuntu /bin/sh -c "cd /data; pwd;"
+— docker run -v "$PWD":/data blang/latex:ubuntu /bin/sh -c "cd /data; latexmk -xelatex -interaction=nonstopmode -halt-on-error ./thesis_zhen/thesis_zhen.tex -outdir=./_build"
 
-— docker ps -a
+# — docker ps -a
 # — docker run blang/latex:ubuntu /bin/sh -c "cd /root/sinatra; bundle exec rake test"
 script: 
   # — wget https://raw.githubusercontent.com/blang/latex-docker/master/latexdockercmd.sh
 
-  — chmod +x latexdockercmd.sh 
+  # — chmod +x latexdockercmd.sh 
 
   — pwd
 
-  — ls -hla ./thesis_zhen
+  # — ls -hla ./thesis_zhen
 
-  — mkdir _build
+  # — mkdir _build
 
-  — ls -hla
+  — tree .
 
   # — "./latexdockercmd.sh pdflatex " 
 deploy:
