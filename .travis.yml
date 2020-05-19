@@ -10,8 +10,6 @@ before_install:
 script: 
   — pwd 
 
-  — tree . 
-
 deploy:
   provider: releases
   file: "./_build/thesis_zhen.pdf"
