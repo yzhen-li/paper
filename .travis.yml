@@ -6,7 +6,7 @@ services:
 before_install:
 — docker pull blang/latex:ubuntu
 
-— docker run -v "$PWD":/data blang/latex:ubuntu /bin/sh -c "cd /data; latexmk -xelatex -interaction=nonstopmode -halt-on-error ./thesis_zhen/thesis_zhen.tex -outdir=./_build"
+— docker run -v "$PWD":/data blang/latex:ubuntu /bin/sh -c "cd /data; latexmk -xelatex -interaction=nonstopmode -halt-on-error ./thesis_zhen/thesis_zhen.tex -outdir=./_build;"
 
 # — docker ps -a
 # — docker run blang/latex:ubuntu /bin/sh -c "cd /root/sinatra; bundle exec rake test"
