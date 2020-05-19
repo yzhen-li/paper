@@ -5,7 +5,7 @@ services:
 before_install: 
   — docker pull blang/latex:ubuntu 
 
-  — docker run -v "$PWD":/data blang/latex:ubuntu /bin/bash -c "cd /data/thesis_zhen/; latexmk -xelatex -interaction=nonstopmode -halt-on-error ./thesis_zhen.tex -outdir=/data/_build;"  
+  — docker run -v "$PWD":/data blang/latex:ubuntu /bin/bash -c "cd /data/thesis_zhen/; pdflatex ./thesis_zhen.tex -outdir=/data/_build;"  
 
 script: 
   — pwd 
