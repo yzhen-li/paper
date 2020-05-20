@@ -1,2 +1,2 @@
 # paper
-customized resources such as latex for writing papers
+this repo contains my Ph.D thesis. I also use travis to release the PDF version.
